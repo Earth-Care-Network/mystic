@@ -10,8 +10,9 @@ ethics: **Earth Care, People Care, Future Care, Fair Share.**
    the shape before you write code.
 2. **Fork, then branch** from `test`: `fix/<short-name>` or `feat/<short-name>`.
 3. **Open a pull request into `test`.** Keep it to one change.
-4. **CI must pass** (`app` and `shell`), and **a maintainer must approve** it.
-   A maintainer merges it; nobody pushes to `test` or `main` directly.
+4. **CI must pass** (`app` and `shell`), **a maintainer must approve** it, and
+   every review thread must be resolved. An admin merges it (squash); nobody
+   pushes to `test` or `main` directly, admins included.
 5. Maintainers promote `test` to `main` for a release, and only maintainers
    create release tags.
 
@@ -21,8 +22,8 @@ ethics: **Earth Care, People Care, Future Care, Fair Share.**
 |--|--|--|--|
 | Open issues and pull requests | yes | yes | yes |
 | Approve a pull request | — | yes | yes |
-| Merge into `test` / `main` | — | through an approved pull request | through an approved pull request |
-| Push directly to `test` / `main` | never | never | emergencies only, and recorded |
+| Merge into `test` / `main` | — | — | yes, through a pull request with passing checks |
+| Push directly to `test` / `main` | never | never | never |
 | Force-push or delete `test` / `main` | never | never | never |
 | Create `v*` tags, approve a release | — | — | yes |
 

@@ -30,8 +30,9 @@ credit you in the advisory unless you'd rather we didn't.
   (Refuse · Allow once · Always allow); sending, deleting and destructive calls
   always ask.
 - Updates are signed (minisign, Tauri updater) and checked before install.
-- `main` and `test` accept changes only through reviewed pull requests with
-  passing checks; force-pushes and deletions are blocked; release tags and the
+- `main` and `test` accept changes only through pull requests with passing
+  checks, a maintainer's approval and an admin's merge; nobody pushes to them
+  directly; force-pushes and deletions are blocked; release tags and the
   release environment (which alone holds the signing secret) are admin-only.
 - Dependabot watches npm, Cargo and Actions; GitHub Actions are pinned to
   commit SHAs; secret scanning and push protection are on.
