@@ -1,3 +1,6 @@
+import { cardProposal } from "../core/ecn";
+import { summarize } from "../core/approvals";
+import { Markdown } from "./Markdown";
 import { useEffect, useRef, useState } from "react";
 import type { ApprovalRequest, ToolCallView } from "../core/agui";
 import type { Agent } from "../core/agents";
@@ -72,7 +75,10 @@ export function ChatView({ agent, onOpenPanel, panelOpen, onSettings }: { agent:
           <div key={m.id} className={`msg ${m.role}`}>
             {m.via ? <div className="via">{m.via}</div> : null}
             {m.tools?.length ? <Tools tools={m.tools} /> : null}
-            {m.text ? <Paragraphs text={m.text} /> : null}
+            {m.tools
+              ?.filter((t) => t.status === "portal" && cardProposal(t.args))
+              .map((t) => <CloudCard key={t.id} agentId={agent.id} messageId={m.id} tool={t} />)}
+            {m.text ? <Paragraphs text={m.text} md={m.role !== "user"} /> : null}
             {m.tools?.some((t) => t.status === "portal") ? (
               <button className="link small" onClick={() => void openUrl(`${e.settings.ecn.origin}/portal?jaguar=full${chat?.ecnThreadId ? `&thread=${chat.ecnThreadId}` : ""}`)}>
                 Review it in Earth Care Network
@@ -130,19 +136,10 @@ export function ChatView({ agent, onOpenPanel, panelOpen, onSettings }: { agent:
   );
 }
 
-function Paragraphs({ text }: { text: string }) {
-  return (
-    <>
-      {text
-        .split(/\n{2,}/)
-        .filter(Boolean)
-        .map((p, i) => (
-          <p key={i} className="bubble">
-            {p}
-          </p>
-        ))}
-    </>
-  );
+/** The person's words stay as typed; an agent's answer keeps its formatting. */
+function Paragraphs({ text, md = true }: { text: string; md?: boolean }) {
+  if (md) return <Markdown text={text} />;
+  return <p className="bubble">{text}</p>;
 }
 
 const STATUS: Record<ToolCallView["status"], string> = {
@@ -165,6 +162,45 @@ function Tools({ tools }: { tools: ToolCallView[] }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+/** A write Jaguar queued on Earth Care Cloud: decided here, run by Earth Care Network. */
+function CloudCard({ agentId, messageId, tool }: { agentId: string; messageId: string; tool: ToolCallView }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [open, setOpen] = useState(false);
+  const card = cardProposal(tool.args);
+  const shown = card ? Object.fromEntries(Object.entries(card.args).filter(([k]) => k !== "suggestion_id")) : {};
+  const decide = async (yes: boolean) => {
+    setBusy(true);
+    setError("");
+    try {
+      await engine.decideCloudCard(agentId, messageId, tool.id, yes);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="approval" role="group" aria-label="Approval needed">
+      <div className="approval-title">{summarize(tool.name, shown)}</div>
+      <p className="muted small">Jaguar will do this in Earth Care Network once you say yes.</p>
+      <button className="link small" onClick={() => setOpen((o) => !o)}>
+        {open ? "Hide details" : "Show exactly what it will do"}
+      </button>
+      {open ? <pre className="args">{JSON.stringify(shown, null, 2)}</pre> : null}
+      {error ? <p className="error" role="alert">{error}</p> : null}
+      <div className="row">
+        <button className="secondary" disabled={busy} onClick={() => void decide(false)}>
+          Refuse
+        </button>
+        <button className="primary" disabled={busy} onClick={() => void decide(true)}>
+          {busy ? "Working…" : "Allow once"}
+        </button>
+      </div>
+    </div>
   );
 }
 

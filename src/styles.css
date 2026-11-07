@@ -185,3 +185,21 @@ label.inline select { min-height: 32px; padding: 4px 8px; }
 .splash .mark.big { width: 72px; height: 72px; opacity: .9; }
 .composer .primary { min-width: 72px; }
 kbd { font: 11px/1 var(--body); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 2px 5px; color: var(--ink-2); background: var(--bubble); }
+
+/* An agent's answer, formatted */
+.bubble.md { white-space: normal; display: flex; flex-direction: column; gap: 8px; }
+.bubble.md > * { margin: 0; }
+.bubble.md h3, .bubble.md h4, .bubble.md h5 { font-family: var(--display); font-size: 16px; }
+.bubble.md ul, .bubble.md ol { padding-left: 20px; display: flex; flex-direction: column; gap: 2px; }
+.bubble.md code { font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--paper); border: 1px solid var(--line); border-radius: 5px; padding: 0 4px; }
+.bubble.md .codeblock { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; overflow: auto; }
+.bubble.md .codeblock code { border: 0; padding: 0; background: none; white-space: pre; }
+.bubble.md blockquote { border-left: 2px solid var(--dusk); padding-left: 10px; color: var(--ink-2); }
+.bubble.md a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; text-decoration-color: var(--dusk); }
+.bubble.md .table-wrap { overflow-x: auto; }
+.bubble.md table { border-collapse: collapse; font-size: 14px; }
+.bubble.md th, .bubble.md td { border: 1px solid var(--line); padding: 5px 9px; text-align: left; vertical-align: top; }
+.bubble.md th { font-weight: 600; background: var(--paper); }
+.bubble.md hr { border: 0; border-top: 1px solid var(--line); }
+
+.ent-actions { display: inline-flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }

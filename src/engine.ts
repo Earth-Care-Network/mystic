@@ -20,7 +20,7 @@ import { preset, type ChatMessage, type ProviderConfig, type ProviderKind } from
 import { trimHistory } from "./core/history";
 import { nextRun } from "./core/schedule";
 import { BUILTIN_TOOLS, type Routine, type ToolContext, type ToolHandler } from "./core/tools";
-import { folder, httpFetch, isMobile, listenForSignIn, notify, openUrl, secrets, waitForAppLink } from "./platform";
+import { folder, httpFetch, isMobile, listenForSignIn, notify, openUrl, secrets, waitForAppLink, fetchPage } from "./platform";
 
 export type ProviderSetup = { id: string; kind: ProviderKind; baseUrl: string; label: string; hasKey: boolean; defaultModel?: string };
 
@@ -137,6 +137,39 @@ export class Engine {
       this.chats.set(agentId, c);
     }
     return c;
+  }
+
+  /** Turn on the enterprise's Mystic Cloud workspace, then read the new state. */
+  async requestWorkspace(organizationId: string): Promise<void> {
+    const token = await this.accessToken();
+    if (!token) throw new Error("Sign in to Earth Care Network again.");
+    await ecn.requestWorkspace(this.settings.ecn.origin, token, organizationId, httpFetch);
+    await this.refreshMe();
+  }
+
+  /**
+   * The person's decision on a card Jaguar queued in a cloud turn, from inside Mystic:
+   * yes runs it through Earth Care Network's own approval door; no records the refusal.
+   */
+  async decideCloudCard(agentId: string, messageId: string, toolId: string, yes: boolean): Promise<void> {
+    const chat = this.chats.get(agentId);
+    const msg = chat?.log.find((m) => m.id === messageId);
+    const tool = msg?.tools?.find((t) => t.id === toolId);
+    const card = tool ? ecn.cardProposal(tool.args) : null;
+    const ent = this.cloudEnterprise();
+    const token = await this.accessToken();
+    if (!chat || !msg || !tool || !card || !ent || !token) throw new Error("That card can't be decided here. Open it in Earth Care Network.");
+    if (yes) {
+      const said = await ecn.approveCard(this.settings.ecn.origin, token, { organizationId: ent.organization_id, tool: tool.name, args: card.args, proposalId: card.proposalId }, httpFetch);
+      tool.status = "done";
+      chat.history.push({ role: "user", content: `(I approved ${tool.name.replace(/_/g, " ")}. Result: ${said})` });
+      msg.text = msg.text ? `${msg.text}\n\nApproved: ${said}` : `Approved: ${said}`;
+    } else {
+      if (chat.ecnThreadId) await ecn.declineCard(this.settings.ecn.origin, token, { organizationId: ent.organization_id, threadId: chat.ecnThreadId, proposalId: card.proposalId }, httpFetch);
+      tool.status = "refused";
+    }
+    await this.saveChat(agentId);
+    this.emit();
   }
 
   private async saveChat(agentId: string) {
@@ -398,6 +431,7 @@ export class Engine {
       runAgent: (agentId, task, d) => this.runQuiet(agentId, task, d, `handoff from ${agent.name}`, ask, signal, [...chain, agentId]),
       defaultModel: () => this.settings.defaultModel,
       now: () => new Date(),
+      fetchPage: (url) => fetchPage(url),
     };
   }
 

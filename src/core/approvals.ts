@@ -19,6 +19,7 @@ export const KNOWN: Record<string, ToolClass> = {
   list_agents: "read",
   read_note: "read",
   memory_write: "write",
+  web_fetch: "write",
   write_note: "write",
   create_agent: "write",
   schedule_task: "write",
@@ -59,7 +60,19 @@ export function classify(tool: string, hints?: Hints, args?: Record<string, unkn
 }
 
 /** What "Always allow" remembers: the tool and, for a mixed tool, the action. */
+/** The site a web fetch reaches: what "Always allow" remembers for it. */
+function siteOf(args?: Record<string, unknown>): string {
+  try {
+    return new URL(String(args?.url || "")).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
 export function policyKey(tool: string, args?: Record<string, unknown>): string {
+  // A web fetch can carry data out in its address, so it asks per site: Always allow
+  // covers that one site, never the web.
+  if (builtIn(tool) === "web_fetch") return `web_fetch#${siteOf(args) || "?"}`;
   // The action and every sub-step a mixed tool takes (`community_step`, `record_kind`,
   // `mode`), so allowing one step never allows another.
   const parts = Object.keys(args || {})

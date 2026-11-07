@@ -56,7 +56,10 @@ export type Enterprise = {
   trial_days_left: number | null;
   cloud: boolean;
   reason: "pro" | "requires_pro" | "seat";
+  /** The enterprise's Mystic Cloud workspace (OpenDuet), when Earth Care Network offers them. */
+  workspace?: Workspace | null;
 };
+export type Workspace = { status: "requested" | "provisioning" | "live" | "suspended" | "failed"; url: string; requested_at: string | null };
 export type Me = { user: { id: number; email: string; name: string }; enterprises: Enterprise[]; cloud: boolean; upgrade_path: string };
 
 function b64url(bytes: Uint8Array): string {
@@ -229,4 +232,63 @@ export async function* cloudRun(origin: string, token: string, input: CloudRunIn
       /* a keep-alive or a line we don't draw */
     }
   }
+}
+
+/** The card Jaguar queued in a cloud turn: its ToolProposal id rides in the arguments. */
+export function cardProposal(args: string): { proposalId: string; args: Record<string, unknown> } | null {
+  try {
+    const parsed = JSON.parse(args || "{}") as Record<string, unknown>;
+    const id = typeof parsed.suggestion_id === "string" ? parsed.suggestion_id : "";
+    return id ? { proposalId: id, args: parsed } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Yes on a queued card: Jaguar's own door runs it (only with its proposal id). */
+export async function approveCard(
+  origin: string,
+  token: string,
+  p: { organizationId: string; tool: string; args: Record<string, unknown>; proposalId: string },
+  fetchImpl: FetchLike,
+): Promise<string> {
+  const res = await fetchImpl(`${origin}/api/v1/mystic/cloud/approve/`, {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json", authorization: `Bearer ${token}` },
+    body: JSON.stringify({ organization_id: p.organizationId, tool_name: p.tool, arguments: p.args, proposal_id: p.proposalId }),
+  });
+  const body = (await res.json().catch(() => ({}))) as { detail?: string; message?: string; result?: unknown };
+  if (!res.ok) throw new Error(body.detail || `Earth Care Network answered HTTP ${res.status}.`);
+  const r = body.result as { message?: string; summary?: string } | undefined;
+  return r?.message || r?.summary || body.message || "Done.";
+}
+
+/** Refuse on a queued card: nothing runs, and Earth Care Network keeps the decision. */
+export async function declineCard(
+  origin: string,
+  token: string,
+  p: { organizationId: string; threadId: string; proposalId: string },
+  fetchImpl: FetchLike,
+): Promise<void> {
+  const res = await fetchImpl(`${origin}/api/v1/mystic/cloud/decline/`, {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json", authorization: `Bearer ${token}` },
+    body: JSON.stringify({ organization_id: p.organizationId, thread_id: p.threadId, proposal_id: p.proposalId }),
+  });
+  if (!res.ok && res.status !== 409) {
+    const body = (await res.json().catch(() => ({}))) as { detail?: string };
+    throw new Error(body.detail || `Earth Care Network answered HTTP ${res.status}.`);
+  }
+}
+
+/** An owner or admin turns on the enterprise's Mystic Cloud workspace (one per enterprise). */
+export async function requestWorkspace(origin: string, token: string, organizationId: string, fetchImpl: FetchLike): Promise<Workspace> {
+  const res = await fetchImpl(`${origin}/api/v1/mystic/workspace/`, {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json", authorization: `Bearer ${token}` },
+    body: JSON.stringify({ organization_id: organizationId }),
+  });
+  const body = (await res.json().catch(() => ({}))) as { workspace?: Workspace; detail?: string };
+  if (!res.ok || !body.workspace) throw new Error(body.detail || `Earth Care Network answered HTTP ${res.status}.`);
+  return body.workspace;
 }

@@ -77,7 +77,10 @@ export function EcnDoor({ primary = false }: { primary?: boolean }) {
                 <li key={ent.organization_id}>
                   <span className="ent-name">{ent.name}</span>
                   {ent.cloud ? (
-                    <span className="pill ok">{ent.trial_days_left ? `Pro trial · ${ent.trial_days_left} days` : "Pro · cloud on"}</span>
+                    <span className="ent-actions">
+                      <span className="pill ok">{ent.trial_days_left ? `Pro trial · ${ent.trial_days_left} days` : "Pro · cloud on"}</span>
+                      <WorkspaceAction ent={ent} />
+                    </span>
                   ) : ent.reason === "seat" ? (
                     <span className="muted small">Your seat can't run its agents</span>
                   ) : (
@@ -128,5 +131,46 @@ export function EcnDoor({ primary = false }: { primary?: boolean }) {
         ) : null}
       </div>
     </section>
+  );
+}
+
+/**
+ * Mystic Cloud, the enterprise's own workspace (OpenDuet signing in with Earth Care Network): open
+ * it once it is live, see that it is being set up, or, for an owner or admin, turn it on.
+ */
+function WorkspaceAction({ ent }: { ent: import("../core/ecn").Enterprise }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const ws = ent.workspace;
+  if (ws === undefined) return null;
+  if (ws?.status === "live" && ws.url)
+    return (
+      <button className="link small" onClick={() => void openUrl(ws.url)}>
+        Open Mystic Cloud
+      </button>
+    );
+  if (ws) return <span className="muted small">{ws.status === "suspended" ? "Mystic Cloud paused" : ws.status === "failed" ? "Mystic Cloud couldn't start" : "Setting up Mystic Cloud"}</span>;
+  if (!["owner", "admin"].includes(ent.role)) return null;
+  return (
+    <>
+      <button
+        className="link small"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          setError("");
+          try {
+            await engine.requestWorkspace(ent.organization_id);
+          } catch (err) {
+            setError((err as Error).message);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {busy ? "Turning on…" : "Turn on Mystic Cloud"}
+      </button>
+      {error ? <span className="error small">{error}</span> : null}
+    </>
   );
 }
