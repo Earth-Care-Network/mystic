@@ -128,3 +128,6 @@ hr { border: 0; border-top: 1px solid var(--line); width: 100%; }
 .doors { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; width: 100%; max-width: 860px; }
 .doors section { display: flex; flex-direction: column; gap: 10px; }
 .doors h2 { margin: 0; font-size: 17px; }
+.row.start { justify-content: flex-start; align-items: center; gap: 14px; }
+label.inline { flex-direction: row; align-items: center; gap: 8px; font-weight: 400; }
+label.inline select { min-height: 32px; padding: 4px 8px; }
