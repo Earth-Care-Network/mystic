@@ -139,6 +139,14 @@ export class Engine {
     return c;
   }
 
+  /** Turn on the enterprise's Mystic Cloud workspace, then read the new state. */
+  async requestWorkspace(organizationId: string): Promise<void> {
+    const token = await this.accessToken();
+    if (!token) throw new Error("Sign in to Earth Care Network again.");
+    await ecn.requestWorkspace(this.settings.ecn.origin, token, organizationId, httpFetch);
+    await this.refreshMe();
+  }
+
   /**
    * The person's decision on a card Jaguar queued in a cloud turn, from inside Mystic:
    * yes runs it through Earth Care Network's own approval door; no records the refusal.

@@ -201,3 +201,5 @@ kbd { font: 11px/1 var(--body); border: 1px solid var(--line); border-bottom-wid
 .bubble.md th, .bubble.md td { border: 1px solid var(--line); padding: 5px 9px; text-align: left; vertical-align: top; }
 .bubble.md th { font-weight: 600; background: var(--paper); }
 .bubble.md hr { border: 0; border-top: 1px solid var(--line); }
+
+.ent-actions { display: inline-flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }

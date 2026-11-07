@@ -56,7 +56,10 @@ export type Enterprise = {
   trial_days_left: number | null;
   cloud: boolean;
   reason: "pro" | "requires_pro" | "seat";
+  /** The enterprise's Mystic Cloud workspace (OpenDuet), when Earth Care Network offers them. */
+  workspace?: Workspace | null;
 };
+export type Workspace = { status: "requested" | "provisioning" | "live" | "suspended" | "failed"; url: string; requested_at: string | null };
 export type Me = { user: { id: number; email: string; name: string }; enterprises: Enterprise[]; cloud: boolean; upgrade_path: string };
 
 function b64url(bytes: Uint8Array): string {
@@ -276,4 +279,16 @@ export async function declineCard(
     const body = (await res.json().catch(() => ({}))) as { detail?: string };
     throw new Error(body.detail || `Earth Care Network answered HTTP ${res.status}.`);
   }
+}
+
+/** An owner or admin turns on the enterprise's Mystic Cloud workspace (one per enterprise). */
+export async function requestWorkspace(origin: string, token: string, organizationId: string, fetchImpl: FetchLike): Promise<Workspace> {
+  const res = await fetchImpl(`${origin}/api/v1/mystic/workspace/`, {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json", authorization: `Bearer ${token}` },
+    body: JSON.stringify({ organization_id: organizationId }),
+  });
+  const body = (await res.json().catch(() => ({}))) as { workspace?: Workspace; detail?: string };
+  if (!res.ok || !body.workspace) throw new Error(body.detail || `Earth Care Network answered HTTP ${res.status}.`);
+  return body.workspace;
 }
