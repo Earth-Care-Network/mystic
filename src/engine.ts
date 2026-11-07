@@ -139,6 +139,31 @@ export class Engine {
     return c;
   }
 
+  /**
+   * The person's decision on a card Jaguar queued in a cloud turn, from inside Mystic:
+   * yes runs it through Earth Care Network's own approval door; no records the refusal.
+   */
+  async decideCloudCard(agentId: string, messageId: string, toolId: string, yes: boolean): Promise<void> {
+    const chat = this.chats.get(agentId);
+    const msg = chat?.log.find((m) => m.id === messageId);
+    const tool = msg?.tools?.find((t) => t.id === toolId);
+    const card = tool ? ecn.cardProposal(tool.args) : null;
+    const ent = this.cloudEnterprise();
+    const token = await this.accessToken();
+    if (!chat || !msg || !tool || !card || !ent || !token) throw new Error("That card can't be decided here. Open it in Earth Care Network.");
+    if (yes) {
+      const said = await ecn.approveCard(this.settings.ecn.origin, token, { organizationId: ent.organization_id, tool: tool.name, args: card.args, proposalId: card.proposalId }, httpFetch);
+      tool.status = "done";
+      chat.history.push({ role: "user", content: `(I approved ${tool.name.replace(/_/g, " ")}. Result: ${said})` });
+      msg.text = msg.text ? `${msg.text}\n\nApproved: ${said}` : `Approved: ${said}`;
+    } else {
+      if (chat.ecnThreadId) await ecn.declineCard(this.settings.ecn.origin, token, { organizationId: ent.organization_id, threadId: chat.ecnThreadId, proposalId: card.proposalId }, httpFetch);
+      tool.status = "refused";
+    }
+    await this.saveChat(agentId);
+    this.emit();
+  }
+
   private async saveChat(agentId: string) {
     const c = this.chats.get(agentId);
     if (c) await folder.writeJson(`chats/${agentId}.json`, { history: trimHistory(c.history), log: c.log.slice(-400), ecnThreadId: c.ecnThreadId });

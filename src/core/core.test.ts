@@ -427,3 +427,11 @@ describe("web_fetch", () => {
     expect(policyKey("ecn__web_fetch", { url: "https://a.org" })).not.toBe("web_fetch#a.org");
   });
 });
+
+describe("cloud cards", () => {
+  test("a queued card's proposal id is read from its arguments", () => {
+    expect(ecnMod.cardProposal('{"name":"Ada","suggestion_id":"abc"}')?.proposalId).toBe("abc");
+    expect(ecnMod.cardProposal('{"path":"/portal/team"}')).toBeNull();
+    expect(ecnMod.cardProposal("not json")).toBeNull();
+  });
+});
