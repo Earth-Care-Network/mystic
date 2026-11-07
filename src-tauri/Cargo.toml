@@ -1,6 +1,6 @@
 [package]
 name = "mystic"
-version = "0.1.0"
+version = "0.2.0"
 description = "Mystic by Earth Care Network"
 authors = ["Earth Care Network"]
 license = "MIT"

@@ -1,7 +1,7 @@
 {
   "name": "mystic",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Mystic by Earth Care Network: an open-source desktop team of AI agents that runs on any key you bring, with Earth Care Cloud for Pro enterprises.",
   "license": "MIT",
   "type": "module",
