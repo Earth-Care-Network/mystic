@@ -1,10 +1,11 @@
+import { EcnDoor } from "./EcnDoor";
 import { useEffect, useState } from "react";
 import { engine } from "../engine";
-import { checkForUpdate, folder, openUrl, type UpdateStatus } from "../platform";
+import { checkForUpdate, folder, isMobile, openUrl, type UpdateStatus } from "../platform";
 import { useEngine } from "./hooks";
 import { ProviderForm } from "./ProviderForm";
 
-const TABS = [
+const ALL_TABS = [
   ["models", "Models & keys"],
   ["cloud", "Earth Care Network"],
   ["routines", "Routines"],
@@ -12,11 +13,14 @@ const TABS = [
   ["folder", "Your folder"],
   ["updates", "Updates"],
 ] as const;
+// On a phone: no keys (Earth Care Cloud only), no folder to open, updates come from the App Store.
+const TABS = isMobile ? ALL_TABS.filter(([k]) => k === "cloud" || k === "routines" || k === "approvals") : ALL_TABS;
 
 export function SettingsView({ tab }: { tab?: string }) {
-  const [active, setActive] = useState(tab || "models");
+  const first = TABS[0][0];
+  const [active, setActive] = useState(tab || first);
   useEffect(() => {
-    setActive(tab || "models");
+    setActive(tab && TABS.some(([k]) => k === tab) ? tab : first);
   }, [tab]);
   return (
     <section className="settings">
@@ -72,66 +76,19 @@ function Models() {
 
 function Cloud() {
   const e = useEngine();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
   const me = e.me;
   const origin = e.settings.ecn.origin;
 
-  const server = (
-    <details className="small">
-      <summary>Server</summary>
-      <select value={origin} onChange={(ev) => void engine.setOrigin(ev.target.value)}>
-        <option value="https://www.earthcare.network">www.earthcare.network</option>
-        <option value="https://test.earthcare.network">test.earthcare.network</option>
-      </select>
-    </details>
-  );
-
-  if (me && "off" in me)
-    return (
-      <>
-        <p className="muted">Earth Care Cloud for Mystic isn't switched on at {origin.replace("https://", "")} yet. Your own keys keep working.</p>
-        <div className="row">
-          <button className="link danger" onClick={() => void engine.signOut()}>
-            Sign out
-          </button>
-        </div>
-        {server}
-      </>
-    );
-
-  if (!me)
-    return (
-      <>
-        <h2>Earth Care Network</h2>
-        <p>Sign in once. Your agents can then use your enterprise's context and tools, and with an enterprise on Pro, run on Earth Care Cloud.</p>
-        <button
-          className="primary"
-          disabled={busy}
-          onClick={async () => {
-            setBusy(true);
-            setError("");
-            try {
-              await engine.signIn();
-            } catch (err) {
-              setError((err as Error).message);
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          {busy ? "Waiting for your browser…" : "Sign in to Earth Care Network"}
-        </button>
-        {error ? <p className="error">{error}</p> : null}
-        {server}
-      </>
-    );
+  // Signed out, or on a server without Mystic's cloud: the same card onboarding draws.
+  if (!me || "off" in me) return <EcnDoor primary />;
 
   const chosen = e.cloudEnterprise();
   return (
     <>
       <h2>Signed in as {me.user.name}</h2>
-      <p className="muted small">{me.user.email}</p>
+      <p className="muted small">
+        {me.user.email} · {origin.replace("https://", "")}
+      </p>
       <h2>Earth Care Cloud</h2>
       {me.enterprises.length ? (
         <ul className="list">
@@ -148,7 +105,7 @@ function Cloud() {
                 {ent.name}
                 <span className="muted small">
                   {" "}
-                  · {ent.tier === "pro" ? (ent.trial_days_left ? `Pro trial, ${ent.trial_days_left} days left` : "Pro") : "Starter"}
+                  · {ent.tier === "pro" ? (ent.trial_days_left ? `Pro trial, ${ent.trial_days_left} days left` : "Pro") : ent.tier === "free" ? "Free" : "Starter"}
                   {ent.reason === "seat" ? " · your seat can't run its agents" : ""}
                 </span>
               </label>
@@ -222,12 +179,12 @@ function Approvals() {
   return (
     <>
       <h2>Always allowed</h2>
-      <p className="muted small">Reads never ask. Anything that changes something asks once, unless you chose Always allow. Sending, posting, paying, signing and deleting always ask.</p>
+      <p className="muted small">Reads never ask. Anything that changes something asks once, unless you chose Always allow. Sending, posting, paying, signing and deleting always ask, and so do memory, new agents and routines. A routine runs with nobody there, so it never uses Always allow.</p>
       {allowed.length ? (
         <ul className="list">
           {allowed.map((t) => (
             <li key={t}>
-              <code>{t.replace("#", " · ")}</code>
+              <code>{t.replaceAll("#", " · ")}</code>
               <button className="link small" onClick={() => void engine.saveSettings({ policy: { alwaysAllow: allowed.filter((x) => x !== t) } })}>
                 Ask again
               </button>

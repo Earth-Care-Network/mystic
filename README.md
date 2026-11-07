@@ -58,6 +58,11 @@ sites, events — through Earth Care Network's MCP server, on any model.
 with your enterprise's context, tools and AI, on its Pro plan (trial included).
 Pick it as the agent's model. Without Pro, Mystic keeps working on your own keys.
 
+The sign-in card names the server it uses. Earth Care Cloud for Mystic is live on
+TEST (`test.earthcare.network`) first; choose it under **Server** to try the cloud
+before it reaches `www.earthcare.network`. A sign-in belongs to the server that issued
+it and is never sent to another one.
+
 ## Your folder
 
 Everything is plain files in `~/Mystic`: `agents/`, `chats/`, `notes/`,
@@ -76,6 +81,26 @@ agents on a self-hosted OpenDuet server.
 
 Mystic checks its signed release feed at launch and installs a new version only
 when you say so.
+
+## Mystic on iPhone and iPad
+
+Mystic on iPhone runs your agents on **Earth Care Cloud**: sign in to Earth Care
+Network, and it opens for an enterprise on Pro (owner, admin or member seat). It
+has no bring-your-own-key and sells nothing in the app; an owner starts Pro on
+earthcare.network. Sign-in goes through Safari and comes back to the app through
+`network.earthcare.mystic:/oauth/callback` (RFC 8252, PKCE).
+
+```sh
+bun run tauri ios dev                         # in the simulator, hot reload
+bun run tauri ios build --target aarch64-sim  # a simulator build
+```
+
+On your own iPhone or iPad: add your Apple ID in Xcode (Settings → Accounts; a free
+account works), plug the device in and turn on Developer Mode, then:
+
+```sh
+APPLE_DEVELOPMENT_TEAM=<your team id> sh scripts/ios-device.sh
+```
 
 ## Contributing and security
 
@@ -101,3 +126,8 @@ bun run app:build    # a signed build needs TAURI_SIGNING_PRIVATE_KEY
 Network sign-in, MCP) as plain TypeScript with no UI, tested with `bun test`.
 `src-tauri/` is the shell: keychain, `~/Mystic`, the sign-in loopback, HTTP,
 updater. `src/ui/` is React.
+
+## Brand
+
+Mystic wears Earth Care Network brand kit v3: the leaf mark in Dusk (`#9362c4`),
+Bricolage Grotesque and Inter, Paper and Night. See [brand/BRAND.md](brand/BRAND.md).

@@ -18,11 +18,19 @@ export const ECN_ORIGINS = {
 
 export const SCOPES = "read build";
 
-/**
- * Earth Care Network's MCP door. The public hosts serve `/mcp` (what every client is
- * told; web/ rewrites it to Django's `/mcp/`); a Django server reached directly, as in
- * local development, only answers `/mcp/` (APPEND_SLASH can't redirect a POST).
- */
+/** Servers Mystic sends a sign-in to: Earth Care Network, TEST, and the one this build was made for. */
+export function isKnownOrigin(origin: string): boolean {
+  const extra = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ECN_ORIGIN;
+  return (Object.values(ECN_ORIGINS) as string[]).includes(origin) || (!!extra && origin === extra);
+}
+
+/** Desktop: a loopback listener on any port (RFC 8252 §7.3). */
+export const DESKTOP_REDIRECT_BASE = "http://127.0.0.1/callback";
+export const loopbackRedirect = (port: number) => `http://127.0.0.1:${port}/callback`;
+/** Phone: the app's own private-use scheme, handed back by the OS (RFC 8252 §7.1). */
+export const MOBILE_REDIRECT = "network.earthcare.mystic:/oauth/callback";
+
+/** Earth Care Network's MCP address: `/mcp` on the public hosts, `/mcp/` on a server reached directly. */
 export function mcpUrl(origin: string): string {
   const host = (() => {
     try {
@@ -70,17 +78,29 @@ export function randomState(): string {
 export async function discover(origin: string, fetchImpl: FetchLike): Promise<OAuthMeta> {
   const res = await fetchImpl(`${origin}/.well-known/oauth-authorization-server`, { method: "GET", headers: { accept: "application/json" } });
   if (!res.ok) throw new Error("Couldn't reach Earth Care Network's sign-in. Check your connection.");
-  return (await res.json()) as OAuthMeta;
+  const meta = (await res.json()) as OAuthMeta & { issuer?: string };
+  // RFC 8414 §3.3: the issuer is the server asked, and every endpoint lives there too.
+  const base = origin.replace(/\/+$/, "");
+  const same = (u: string) => {
+    try {
+      return new URL(u).origin === new URL(base).origin;
+    } catch {
+      return false;
+    }
+  };
+  if ((meta.issuer && meta.issuer.replace(/\/+$/, "") !== base) || ![meta.authorization_endpoint, meta.token_endpoint, meta.registration_endpoint].every(same))
+    throw new Error("That server's sign-in points somewhere else, so Mystic stopped.");
+  return meta;
 }
 
 /** Registers once per install; the server reuses a public client with the same name and callback. */
-export async function register(meta: OAuthMeta, fetchImpl: FetchLike): Promise<string> {
+export async function register(meta: OAuthMeta, fetchImpl: FetchLike, redirectUri: string = DESKTOP_REDIRECT_BASE): Promise<string> {
   const res = await fetchImpl(meta.registration_endpoint, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       client_name: CLIENT_NAME,
-      redirect_uris: ["http://127.0.0.1/callback"],
+      redirect_uris: [redirectUri],
       token_endpoint_auth_method: "none",
       grant_types: ["authorization_code", "refresh_token"],
       response_types: ["code"],
@@ -91,11 +111,11 @@ export async function register(meta: OAuthMeta, fetchImpl: FetchLike): Promise<s
   return ((await res.json()) as { client_id: string }).client_id;
 }
 
-export function authorizeUrl(meta: OAuthMeta, p: { clientId: string; port: number; challenge: string; state: string }): string {
+export function authorizeUrl(meta: OAuthMeta, p: { clientId: string; redirectUri: string; challenge: string; state: string }): string {
   const q = new URLSearchParams({
     response_type: "code",
     client_id: p.clientId,
-    redirect_uri: `http://127.0.0.1:${p.port}/callback`,
+    redirect_uri: p.redirectUri,
     code_challenge: p.challenge,
     code_challenge_method: "S256",
     scope: SCOPES,
@@ -126,7 +146,7 @@ function toTokens(json: any): Tokens {
 
 export async function exchangeCode(
   meta: OAuthMeta,
-  p: { clientId: string; code: string; verifier: string; port: number },
+  p: { clientId: string; code: string; verifier: string; redirectUri: string },
   fetchImpl: FetchLike,
 ): Promise<Tokens> {
   const res = await fetchImpl(meta.token_endpoint, {
@@ -137,7 +157,7 @@ export async function exchangeCode(
       code: p.code,
       code_verifier: p.verifier,
       client_id: p.clientId,
-      redirect_uri: `http://127.0.0.1:${p.port}/callback`,
+      redirect_uri: p.redirectUri,
     }).toString(),
   });
   if (!res.ok) throw new Error(`Sign-in didn't finish${await oauthReason(res)}. Start it again from Settings · Earth Care Network.`);

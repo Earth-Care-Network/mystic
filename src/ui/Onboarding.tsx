@@ -1,62 +1,32 @@
-import { useState } from "react";
-import { engine } from "../engine";
-import { useEngine } from "./hooks";
+import { EcnDoor } from "./EcnDoor";
+import { Mark } from "./Mark";
 import { ProviderForm } from "./ProviderForm";
 
+/** First run on a Mac: two ways in, side by side. Either one makes Mystic usable. */
 export function Onboarding({ onDone }: { onDone: () => void }) {
-  const e = useEngine();
-  const [error, setError] = useState("");
-  const me = e.me;
-  const signedIn = !!me && !("off" in me);
-  const [busy, setBusy] = useState(false);
   return (
     <div className="onboarding">
       <div className="hero">
-        <span className="mark big" aria-hidden />
+        <Mark big />
         <h1>Mystic</h1>
+        <p className="by">by Earth Care Network</p>
         <p className="lede">Your team of AI agents. Free and open source, on any key you bring.</p>
-        <p className="ethics">Earth Care · People Care · Future Care · Fair Share</p>
       </div>
-      <div className="doors">
-        <section>
+      <ol className="doors">
+        <li>
+          <span className="step">1 · One way</span>
           <h2>Bring your own key</h2>
           <p className="muted">OpenRouter, Anthropic, OpenAI, Gemini, Grok, a model on this Mac, or any compatible endpoint.</p>
           <ProviderForm onAdded={onDone} />
-        </section>
-        <section>
-          <h2>Or sign in to Earth Care Network</h2>
-          <p className="muted">Your agents get your enterprise's context and tools. With an enterprise on Pro, they can run on Earth Care Cloud.</p>
-          {me && "off" in me ? <p className="error">Earth Care Cloud isn't switched on at this server yet. Add a key to start.</p> : null}
-          {signedIn ? (
-            <p className="muted">
-              You're signed in as {me.user.name}. None of your enterprises is on Pro, so Earth Care Cloud isn't available. Add a key to start, or{" "}
-              <button className="link" onClick={() => void import("../platform").then((p) => p.openUrl(`${e.settings.ecn.origin}${me.upgrade_path}`))}>
-                start Pro's trial
-              </button>
-              .
-            </p>
-          ) : null}
-          <button
-            className="secondary"
-            disabled={busy}
-            onClick={async () => {
-              setBusy(true);
-              setError("");
-              try {
-                await engine.signIn();
-                if (engine.hasUsableModel()) onDone();
-              } catch (err) {
-                setError((err as Error).message);
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            {busy ? "Waiting for your browser…" : "Sign in to Earth Care Network"}
-          </button>
-          {error ? <p className="error">{error}</p> : null}
-        </section>
-      </div>
+        </li>
+        <li>
+          <span className="step">2 · Or</span>
+          <h2>Sign in</h2>
+          <p className="muted">Use your enterprise's context and tools, and Earth Care Cloud on Pro.</p>
+          <EcnDoor />
+        </li>
+      </ol>
+      <p className="ethics">Earth Care · People Care · Future Care · Fair Share</p>
     </div>
   );
 }

@@ -34,7 +34,7 @@ credit you in the advisory unless you'd rather we didn't.
   checks, a maintainer's approval and an admin's merge; nobody pushes to them
   directly; force-pushes and deletions are blocked; release tags and the
   release environment (which alone holds the signing secret) are admin-only.
-- Dependabot watches npm, Cargo and Actions; GitHub Actions are pinned to
+- Dependabot watches bun, Cargo and Actions; GitHub Actions are pinned to
   commit SHAs; secret scanning and push protection are on.
 
 ## Supported versions

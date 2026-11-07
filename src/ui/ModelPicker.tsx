@@ -1,10 +1,17 @@
 import type { ModelChoice } from "../core/agents";
+import { isMobile } from "../platform";
 import { useEngine } from "./hooks";
 
 /** Pick any provider the person set up, plus Earth Care Cloud when an enterprise on Pro allows it. */
 export function ModelPicker({ value, onChange }: { value: ModelChoice; onChange: (m: ModelChoice) => void }) {
   const e = useEngine();
   const cloud = e.cloudEnterprise()?.cloud;
+  if (isMobile)
+    return (
+      <p className="muted small">
+        Runs on Earth Care Cloud for {e.cloudEnterprise()?.name || "your enterprise"}.
+      </p>
+    );
   return (
     <div className="model-picker">
       <label>

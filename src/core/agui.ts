@@ -46,6 +46,8 @@ export type ApprovalRequest = {
   tool: string;
   summary: string;
   args: Record<string, unknown>;
+  /** Whether the card offers "Always allow" (never for memory, new agents, routines or sends). */
+  canAlways?: boolean;
 };
 
 export function emptyTurn(runId = ""): TurnView {

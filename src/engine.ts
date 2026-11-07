@@ -20,7 +20,7 @@ import { preset, type ChatMessage, type ProviderConfig, type ProviderKind } from
 import { trimHistory } from "./core/history";
 import { nextRun } from "./core/schedule";
 import { BUILTIN_TOOLS, type Routine, type ToolContext, type ToolHandler } from "./core/tools";
-import { folder, httpFetch, listenForSignIn, notify, openUrl, secrets } from "./platform";
+import { folder, httpFetch, isMobile, listenForSignIn, notify, openUrl, secrets, waitForAppLink } from "./platform";
 
 export type ProviderSetup = { id: string; kind: ProviderKind; baseUrl: string; label: string; hasKey: boolean; defaultModel?: string };
 
@@ -38,12 +38,15 @@ export type Chat = { history: ChatMessage[]; log: LogEntry[]; ecnThreadId?: stri
 export const MAX_TOOLS = 128;
 
 type Ask = (req: ApprovalRequest) => Promise<Decision>;
+/** The answer a routine gets: nobody is there. Handoffs from a routine pass it on. */
+const UNATTENDED: Ask = async () => "unattended";
 
 export const DEFAULT_SETTINGS: Settings = {
   providers: [],
   defaultModel: { providerId: "openrouter", model: "anthropic/claude-sonnet-5.5" },
   policy: { alwaysAllow: [] },
-  ecn: { origin: ecn.ECN_ORIGINS.production, toolsForAgents: true },
+  // A build can point at another server (VITE_ECN_ORIGIN, e.g. a local backend for tests).
+  ecn: { origin: (import.meta.env?.VITE_ECN_ORIGIN as string | undefined) || ecn.ECN_ORIGINS.production, toolsForAgents: true },
 };
 
 const TOKENS = "ecn.tokens";
@@ -85,6 +88,11 @@ export class Engine {
   async load(): Promise<void> {
     this.settings = { ...DEFAULT_SETTINGS, ...(await folder.readJson<Partial<Settings>>("settings.json", {})) };
     this.settings.ecn = { ...DEFAULT_SETTINGS.ecn, ...this.settings.ecn };
+    // settings.json is a plain file: a server it names that Mystic doesn't know never gets a token.
+    if (!ecn.isKnownOrigin(this.settings.ecn.origin)) {
+      await secrets.delete(TOKENS);
+      this.settings.ecn = { ...this.settings.ecn, origin: DEFAULT_SETTINGS.ecn.origin, clientId: undefined, enterpriseId: undefined };
+    }
     const files = await folder.list("agents");
     const loaded = await Promise.all(files.filter((f) => f.endsWith(".json")).map((f) => folder.readJson<Agent | null>(`agents/${f}`, null)));
     this.agents = loaded.filter((a): a is Agent => !!a && typeof a.id === "string");
@@ -177,12 +185,19 @@ export class Engine {
   /** A model this agent can actually run on: a set-up provider, or Earth Care Cloud on Pro. */
   canRun(model: ModelChoice): boolean {
     if (model.providerId === "ecn-cloud") return !!this.cloudEnterprise()?.cloud;
+    if (isMobile) return false; // on a phone, agents run on Earth Care Cloud only
     return !!model.model && this.settings.providers.some((p) => p.id === model.providerId);
   }
 
   /** Mystic can do something: there is a key, or an enterprise on Pro for the cloud. */
   hasUsableModel(): boolean {
+    if (isMobile) return !!this.cloudChoices().length;
     return this.settings.providers.length > 0 || !!this.cloudChoices().length;
+  }
+
+  /** The enterprises whose agents this person may run on Earth Care Cloud. */
+  cloudEnterprises(): ecn.Enterprise[] {
+    return this.cloudChoices();
   }
 
   private cloudChoices(): ecn.Enterprise[] {
@@ -191,7 +206,7 @@ export class Engine {
 
   /** Move agents whose model can't run to one that can (the first key, else the cloud). */
   async repairModels(): Promise<void> {
-    const first = this.settings.providers[0];
+    const first = isMobile ? undefined : this.settings.providers[0];
     const fallback: ModelChoice | null = first
       ? { providerId: first.id, model: this.modelFor(first.id) }
       : this.cloudChoices().length
@@ -214,7 +229,9 @@ export class Engine {
     const raw = await secrets.get(TOKENS);
     if (!raw) return null;
     try {
-      return JSON.parse(raw) as ecn.Tokens;
+      const t = JSON.parse(raw) as ecn.Tokens & { origin?: string };
+      // Tokens belong to the server that issued them; a sign-in never travels to another one.
+      return t.origin === this.settings.ecn.origin ? t : null;
     } catch {
       return null;
     }
@@ -231,7 +248,7 @@ export class Engine {
       try {
         const meta = await ecn.discover(this.settings.ecn.origin, httpFetch);
         const fresh = await ecn.refresh(meta, this.settings.ecn.clientId!, t.refresh_token!, httpFetch);
-        await secrets.set(TOKENS, JSON.stringify(fresh));
+        await secrets.set(TOKENS, JSON.stringify({ ...fresh, origin: this.settings.ecn.origin }));
         return fresh.access_token;
       } finally {
         this.refreshing = null;
@@ -242,7 +259,7 @@ export class Engine {
 
   /** Point Mystic at another Earth Care Network server: the old sign-in never travels there. */
   async setOrigin(origin: string): Promise<void> {
-    if (origin === this.settings.ecn.origin) return;
+    if (origin === this.settings.ecn.origin || !ecn.isKnownOrigin(origin)) return;
     await secrets.delete(TOKENS);
     this.me = null;
     this.ecnTools = null;
@@ -251,19 +268,36 @@ export class Engine {
 
   async signIn(): Promise<void> {
     const origin = this.settings.ecn.origin;
+    const redirectBase = isMobile ? ecn.MOBILE_REDIRECT : ecn.DESKTOP_REDIRECT_BASE;
     const meta = await ecn.discover(origin, httpFetch);
-    const clientId = this.settings.ecn.clientId || (await ecn.register(meta, httpFetch));
+    const clientId = this.settings.ecn.clientId || (await ecn.register(meta, httpFetch, redirectBase));
     if (clientId !== this.settings.ecn.clientId) await this.saveSettings({ ecn: { ...this.settings.ecn, clientId } });
     const { verifier, challenge } = await ecn.pkcePair();
     const state = ecn.randomState();
-    const { port, callback } = await listenForSignIn(state);
-    await openUrl(ecn.authorizeUrl(meta, { clientId, port, challenge, state }));
-    const cb = await callback;
+    let redirectUri: string;
+    let cb: { code?: string; state?: string; error?: string };
+    if (isMobile) {
+      // Safari shows the consent; iOS hands the code back through the app's own scheme.
+      redirectUri = ecn.MOBILE_REDIRECT;
+      const back = waitForAppLink(ecn.MOBILE_REDIRECT, state);
+      await openUrl(ecn.authorizeUrl(meta, { clientId, redirectUri, challenge, state }));
+      try {
+        const url = await back;
+        cb = { code: url.searchParams.get("code") || undefined, state: url.searchParams.get("state") || undefined, error: url.searchParams.get("error") || undefined };
+      } catch {
+        cb = { error: "timeout", state };
+      }
+    } else {
+      const { port, callback } = await listenForSignIn(state);
+      redirectUri = ecn.loopbackRedirect(port);
+      await openUrl(ecn.authorizeUrl(meta, { clientId, redirectUri, challenge, state }));
+      cb = await callback;
+    }
+    if (cb.state !== state) throw new Error("That sign-in didn't come from this window. Try again.");
     if (cb.error || !cb.code)
       throw new Error(cb.error === "access_denied" ? "Sign-in was cancelled." : cb.error === "timeout" ? "Sign-in timed out. Try again." : "Sign-in didn't finish. Try again.");
-    if (cb.state !== state) throw new Error("That sign-in didn't come from this window. Try again.");
-    const tokens = await ecn.exchangeCode(meta, { clientId, code: cb.code, verifier, port }, httpFetch);
-    await secrets.set(TOKENS, JSON.stringify(tokens));
+    const tokens = await ecn.exchangeCode(meta, { clientId, code: cb.code, verifier, redirectUri }, httpFetch);
+    await secrets.set(TOKENS, JSON.stringify({ ...tokens, origin }));
     this.ecnTools = null;
     await this.refreshMe();
     await this.repairModels();
@@ -401,6 +435,7 @@ export class Engine {
       policy: this.settings.policy,
       onPolicy: (policy) => void this.saveSettings({ policy }),
       askApproval: ask,
+      unattended: ask === UNATTENDED,
       fetchImpl: httpFetch,
       signal,
       threadId,
@@ -481,7 +516,7 @@ export class Engine {
       // Advance every due routine before running any, so none runs twice.
       for (const r of due) r.nextAt = nextRun(r.schedule, new Date()).toISOString();
       await folder.writeJson("routines.json", this.routines);
-      const unattended: Ask = async () => "unattended";
+      const unattended = UNATTENDED;
       for (const r of due) {
         const answer = await this.runQuiet(r.agentId, r.task, 1, `routine · ${r.label}`, unattended, new AbortController().signal, [r.agentId]);
         const agent = this.agents.find((a) => a.id === r.agentId);
