@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import * as mdMod from "./markdown";
 import * as approvalsMod from "./approvals";
 import * as ecnMod from "./ecn";
 import { emptyTurn, reduce, type AguiEvent } from "./agui";
@@ -395,5 +396,34 @@ describe("Earth Care servers", () => {
     const meta = { issuer: "https://www.earthcare.network", authorization_endpoint: "https://www.earthcare.network/oauth/authorize", token_endpoint: "https://evil.example/token", registration_endpoint: "https://www.earthcare.network/oauth/register" };
     const f = async () => new Response(JSON.stringify(meta), { status: 200 });
     await expect(ecnMod.discover("https://www.earthcare.network", f as any)).rejects.toThrow();
+  });
+});
+
+describe("markdown", () => {
+  const { parse, inline, safeHref } = mdMod;
+  test("blocks: heading, list, code, table", () => {
+    const b = parse("# Plan\n\n- one\n- **two**\n\n```ts\nconst x = 1;\n```\n\n| a | b |\n|--|--|\n| 1 | 2 |");
+    expect(b.map((x) => x.t)).toEqual(["h", "ul", "code", "table"]);
+  });
+  test("links only for https and mailto", () => {
+    expect(safeHref("https://earthcare.network")).toBe("https://earthcare.network");
+    expect(safeHref("javascript:alert(1)")).toBeNull();
+    expect(safeHref("file:///etc/passwd")).toBeNull();
+    expect(safeHref("http://example.com")).toBeNull();
+    expect(inline("[x](javascript:alert(1))")).toEqual([{ t: "text", v: "x" }, { t: "text", v: ")" }]);
+  });
+  test("html stays text", () => {
+    expect(inline("<img src=x onerror=alert(1)>")).toEqual([{ t: "text", v: "<img src=x onerror=alert(1)>" }]);
+  });
+});
+
+describe("web_fetch", () => {
+  const { policyKey, needsApproval, applyDecision } = approvalsMod;
+  test("asks per site, and Always allow covers only that site", () => {
+    const p = applyDecision({ alwaysAllow: [] }, "web_fetch", "always_allow", undefined, { url: "https://example.org/a" });
+    expect(p.alwaysAllow).toEqual(["web_fetch#example.org"]);
+    expect(needsApproval("web_fetch", p, undefined, { url: "https://example.org/b?x=1" })).toBe(false);
+    expect(needsApproval("web_fetch", p, undefined, { url: "https://evil.example/?d=secret" })).toBe(true);
+    expect(policyKey("ecn__web_fetch", { url: "https://a.org" })).not.toBe("web_fetch#a.org");
   });
 });

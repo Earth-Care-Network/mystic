@@ -20,7 +20,7 @@ import { preset, type ChatMessage, type ProviderConfig, type ProviderKind } from
 import { trimHistory } from "./core/history";
 import { nextRun } from "./core/schedule";
 import { BUILTIN_TOOLS, type Routine, type ToolContext, type ToolHandler } from "./core/tools";
-import { folder, httpFetch, isMobile, listenForSignIn, notify, openUrl, secrets, waitForAppLink } from "./platform";
+import { folder, httpFetch, isMobile, listenForSignIn, notify, openUrl, secrets, waitForAppLink, fetchPage } from "./platform";
 
 export type ProviderSetup = { id: string; kind: ProviderKind; baseUrl: string; label: string; hasKey: boolean; defaultModel?: string };
 
@@ -398,6 +398,7 @@ export class Engine {
       runAgent: (agentId, task, d) => this.runQuiet(agentId, task, d, `handoff from ${agent.name}`, ask, signal, [...chain, agentId]),
       defaultModel: () => this.settings.defaultModel,
       now: () => new Date(),
+      fetchPage: (url) => fetchPage(url),
     };
   }
 

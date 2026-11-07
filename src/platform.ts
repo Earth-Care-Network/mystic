@@ -139,6 +139,12 @@ export async function waitForAppLink(prefix: string, state: string, timeoutMs = 
   });
 }
 
+/** One public web page as text, fetched by the Rust side (it refuses private addresses). */
+export async function fetchPage(url: string): Promise<{ url: string; status: number; content_type: string; text: string; truncated: boolean }> {
+  if (!inTauri || isMobile) throw new Error("Reading web pages needs Mystic on a Mac.");
+  return invoke("web_fetch", { url });
+}
+
 export async function notify(title: string, body: string): Promise<void> {
   if (!inTauri) return;
   const n = await import("@tauri-apps/plugin-notification");

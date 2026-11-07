@@ -1,3 +1,4 @@
+import { Markdown } from "./Markdown";
 import { useEffect, useRef, useState } from "react";
 import type { ApprovalRequest, ToolCallView } from "../core/agui";
 import type { Agent } from "../core/agents";
@@ -72,7 +73,7 @@ export function ChatView({ agent, onOpenPanel, panelOpen, onSettings }: { agent:
           <div key={m.id} className={`msg ${m.role}`}>
             {m.via ? <div className="via">{m.via}</div> : null}
             {m.tools?.length ? <Tools tools={m.tools} /> : null}
-            {m.text ? <Paragraphs text={m.text} /> : null}
+            {m.text ? <Paragraphs text={m.text} md={m.role !== "user"} /> : null}
             {m.tools?.some((t) => t.status === "portal") ? (
               <button className="link small" onClick={() => void openUrl(`${e.settings.ecn.origin}/portal?jaguar=full${chat?.ecnThreadId ? `&thread=${chat.ecnThreadId}` : ""}`)}>
                 Review it in Earth Care Network
@@ -130,19 +131,10 @@ export function ChatView({ agent, onOpenPanel, panelOpen, onSettings }: { agent:
   );
 }
 
-function Paragraphs({ text }: { text: string }) {
-  return (
-    <>
-      {text
-        .split(/\n{2,}/)
-        .filter(Boolean)
-        .map((p, i) => (
-          <p key={i} className="bubble">
-            {p}
-          </p>
-        ))}
-    </>
-  );
+/** The person's words stay as typed; an agent's answer keeps its formatting. */
+function Paragraphs({ text, md = true }: { text: string; md?: boolean }) {
+  if (md) return <Markdown text={text} />;
+  return <p className="bubble">{text}</p>;
 }
 
 const STATUS: Record<ToolCallView["status"], string> = {

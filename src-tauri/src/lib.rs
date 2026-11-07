@@ -217,6 +217,186 @@ fn oauth_listen(app: AppHandle, state: String) -> Result<u16, String> {
     Ok(port)
 }
 
+// ---- web fetch ----------------------------------------------------------------
+
+#[derive(Serialize)]
+struct Fetched {
+    url: String,
+    status: u16,
+    content_type: String,
+    text: String,
+    truncated: bool,
+}
+
+/// An address an agent may reach: public unicast only (no loopback, private, link-local,
+/// CGNAT, multicast, metadata or documentation ranges).
+fn public_ip(ip: std::net::IpAddr) -> bool {
+    use std::net::IpAddr;
+    match ip {
+        IpAddr::V4(v) => {
+            let o = v.octets();
+            !(v.is_private()
+                || v.is_loopback()
+                || v.is_link_local()
+                || v.is_broadcast()
+                || v.is_documentation()
+                || v.is_unspecified()
+                || v.is_multicast()
+                || o[0] == 0
+                || (o[0] == 100 && (64..128).contains(&o[1]))
+                || (o[0] == 192 && o[1] == 0 && o[2] == 0)
+                || o[0] >= 240)
+        }
+        IpAddr::V6(v) => {
+            if let Some(v4) = v.to_ipv4_mapped() {
+                return public_ip(IpAddr::V4(v4));
+            }
+            let s = v.segments();
+            !(v.is_loopback() || v.is_unspecified() || v.is_multicast() || (s[0] & 0xfe00) == 0xfc00 || (s[0] & 0xffc0) == 0xfe80)
+        }
+    }
+}
+
+fn html_to_text(html: &str) -> String {
+    let lower = html.to_ascii_lowercase();
+    let mut out = String::with_capacity(html.len() / 3);
+    let mut i = 0;
+    let bytes = html.as_bytes();
+    while i < bytes.len() {
+        if bytes[i] == b'<' {
+            // Drop script, style, noscript, svg and head bodies entirely.
+            let mut skipped = false;
+            for tag in ["script", "style", "noscript", "svg", "head", "template"] {
+                if lower[i + 1..].starts_with(tag) {
+                    if let Some(end) = lower[i..].find(&format!("</{tag}")) {
+                        i += end;
+                        if let Some(close) = lower[i..].find('>') {
+                            i += close + 1;
+                        }
+                        skipped = true;
+                    }
+                    break;
+                }
+            }
+            if skipped {
+                continue;
+            }
+            let block = ["<p", "<br", "<div", "<li", "<h1", "<h2", "<h3", "<h4", "<tr", "</p", "</div", "</li", "</h", "</tr"]
+                .iter()
+                .any(|t| lower[i..].starts_with(t));
+            match lower[i..].find('>') {
+                Some(close) => i += close + 1,
+                None => break,
+            }
+            out.push(if block { '\n' } else { ' ' });
+            continue;
+        }
+        let ch = html[i..].chars().next().unwrap_or(' ');
+        out.push(ch);
+        i += ch.len_utf8();
+    }
+    let out = out
+        .replace("&nbsp;", " ")
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'");
+    let mut lines: Vec<String> = Vec::new();
+    for line in out.lines() {
+        let t = line.split_whitespace().collect::<Vec<_>>().join(" ");
+        if !t.is_empty() {
+            lines.push(t);
+        }
+    }
+    lines.join("\n")
+}
+
+/// Fetch one public web page for an agent: https or http on the standard ports, every
+/// hop resolved and checked (redirects included), the connection pinned to the checked
+/// address, 20 s, 2 MB read, text out (HTML reduced to its words).
+#[tauri::command]
+async fn web_fetch(url: String) -> Result<Fetched, String> {
+    use tauri_plugin_http::reqwest;
+    let mut current = url::Url::parse(url.trim()).map_err(|_| "That isn't a web address.".to_string())?;
+    for _hop in 0..4 {
+        if !matches!(current.scheme(), "https" | "http") || !current.username().is_empty() || current.password().is_some() {
+            return Err("Only plain http(s) web addresses can be fetched.".into());
+        }
+        let host = current.host_str().ok_or("That address has no host.")?.to_string();
+        let port = current.port_or_known_default().ok_or("That address has no port.")?;
+        if port != 443 && port != 80 {
+            return Err("Only the standard web ports (80, 443) can be fetched.".into());
+        }
+        let addrs: Vec<std::net::SocketAddr> = tokio_lookup(&host, port).await?;
+        let addr = *addrs.first().ok_or("That host didn't resolve.")?;
+        if addrs.iter().any(|a| !public_ip(a.ip())) {
+            return Err("That address points inside your network, so Mystic won't fetch it.".into());
+        }
+        let client = reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .timeout(Duration::from_secs(20))
+            .resolve(&host, addr)
+            .user_agent("Mystic/0.2 (+https://earth-care-network.github.io/mystic)")
+            .build()
+            .map_err(|e| e.to_string())?;
+        let mut res = client.get(current.clone()).send().await.map_err(|e| format!("Couldn't fetch it: {e}"))?;
+        let status = res.status();
+        if status.is_redirection() {
+            let loc = res.headers().get("location").and_then(|v| v.to_str().ok()).ok_or("A redirect with no address.")?;
+            current = current.join(loc).map_err(|_| "A redirect to an invalid address.".to_string())?;
+            continue;
+        }
+        let content_type = res.headers().get("content-type").and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
+        let mut body: Vec<u8> = Vec::new();
+        let mut truncated = false;
+        while let Some(chunk) = res.chunk().await.map_err(|e| e.to_string())? {
+            body.extend_from_slice(&chunk);
+            if body.len() > 2 * 1024 * 1024 {
+                truncated = true;
+                break;
+            }
+        }
+        let raw = String::from_utf8_lossy(&body).into_owned();
+        let mut text = if content_type.contains("html") || raw.trim_start().starts_with('<') { html_to_text(&raw) } else { raw };
+        if text.chars().count() > 20_000 {
+            text = text.chars().take(20_000).collect();
+            truncated = true;
+        }
+        return Ok(Fetched { url: current.to_string(), status: status.as_u16(), content_type, text, truncated });
+    }
+    Err("Too many redirects.".into())
+}
+
+async fn tokio_lookup(host: &str, port: u16) -> Result<Vec<std::net::SocketAddr>, String> {
+    let target = format!("{host}:{port}");
+    tauri::async_runtime::spawn_blocking(move || {
+        use std::net::ToSocketAddrs;
+        target.to_socket_addrs().map(|a| a.collect::<Vec<_>>()).map_err(|_| "That host didn't resolve.".to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[cfg(test)]
+mod tests_web {
+    use super::*;
+    #[test]
+    fn private_addresses_are_refused() {
+        for ip in ["127.0.0.1", "10.0.0.1", "192.168.1.1", "169.254.169.254", "100.64.0.1", "::1", "fd00::1", "::ffff:127.0.0.1", "0.0.0.0"] {
+            assert!(!public_ip(ip.parse().unwrap()), "{ip}");
+        }
+        for ip in ["93.184.216.34", "2606:4700::1111"] {
+            assert!(public_ip(ip.parse().unwrap()), "{ip}");
+        }
+    }
+    #[test]
+    fn html_becomes_words() {
+        let t = html_to_text("<html><head><title>x</title></head><body><script>evil()</script><h1>Hi</h1><p>One &amp; two</p></body></html>");
+        assert!(t.contains("Hi") && t.contains("One & two") && !t.contains("evil"));
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
@@ -240,7 +420,8 @@ pub fn run() {
             ws_write,
             ws_list,
             ws_delete,
-            oauth_listen
+            oauth_listen,
+            web_fetch
         ])
         .run(tauri::generate_context!())
         .expect("Mystic failed to start");
