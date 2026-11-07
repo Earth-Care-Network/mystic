@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { engine } from "./engine";
-import { checkForUpdate } from "./platform";
+import { checkForUpdate, isMobile } from "./platform";
+import { MobileGate } from "./ui/MobileGate";
 import { AgentPanel } from "./ui/AgentPanel";
 import { ChatView } from "./ui/Chat";
 import { useEngine } from "./ui/hooks";
@@ -14,6 +15,7 @@ export function App() {
   const [loaded, setLoaded] = useState(false);
   const [view, setView] = useState<View>({ kind: "chat", agentId: "chief-of-staff" });
   const [panel, setPanel] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
 
   const [update, setUpdate] = useState<string | null>(null);
 
@@ -24,6 +26,8 @@ export function App() {
   }, []);
 
   if (!loaded) return <div className="splash">Mystic</div>;
+  // On a phone, Mystic runs only on Earth Care Cloud: a sign-in and an enterprise on Pro.
+  if (isMobile && !e.hasUsableModel()) return <MobileGate />;
   // Onboarding until Mystic can actually run something: a key, or an enterprise on Pro.
   if (!e.hasUsableModel()) return <Onboarding onDone={() => setView({ kind: "chat", agentId: "chief-of-staff" })} />;
 
@@ -31,8 +35,11 @@ export function App() {
   const signedIn = e.me && !("off" in e.me);
 
   return (
-    <div className="shell">
-      <aside className="sidebar">
+    <div className={`shell ${navOpen ? "nav-open" : ""}`}>
+      <button className="nav-toggle ghost" aria-label={navOpen ? "Close your team" : "Open your team"} aria-expanded={navOpen} onClick={() => setNavOpen((o) => !o)}>
+        ☰
+      </button>
+      <aside className="sidebar" onClick={(ev) => (ev.target as HTMLElement).closest("button") && setNavOpen(false)}>
         <div className="brand" data-tauri-drag-region>
           <span className="mark" aria-hidden /> Mystic
         </div>

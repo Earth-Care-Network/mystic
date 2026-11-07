@@ -1,20 +1,48 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "What Mystic's window may do. HTTP reaches model providers and Earth Care Network over https, and local models on this machine only.",
-  "windows": ["main"],
+  "description": "What Mystic's window may do on every platform. HTTP reaches model providers and Earth Care Network over https, and local models on this machine only.",
+  "windows": [
+    "main"
+  ],
   "permissions": [
     "core:default",
     "core:event:default",
     "opener:default",
-    { "identifier": "opener:allow-open-url", "allow": [{ "url": "https://*" }] },
-    { "identifier": "opener:allow-open-path", "allow": [{ "path": "$HOME/Mystic" }, { "path": "$HOME/Mystic/**" }] },
+    "deep-link:default",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        {
+          "url": "https://*"
+        }
+      ]
+    },
+    {
+      "identifier": "opener:allow-open-path",
+      "allow": [
+        {
+          "path": "$HOME/Mystic"
+        },
+        {
+          "path": "$HOME/Mystic/**"
+        }
+      ]
+    },
     "notification:default",
-    "process:allow-restart",
-    "updater:default",
     {
       "identifier": "http:default",
-      "allow": [{ "url": "https://*" }, { "url": "http://127.0.0.1:*" }, { "url": "http://localhost:*" }]
+      "allow": [
+        {
+          "url": "https://*"
+        },
+        {
+          "url": "http://127.0.0.1:*"
+        },
+        {
+          "url": "http://localhost:*"
+        }
+      ]
     }
   ]
 }

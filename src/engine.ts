@@ -20,7 +20,7 @@ import { preset, type ChatMessage, type ProviderConfig, type ProviderKind } from
 import { trimHistory } from "./core/history";
 import { nextRun } from "./core/schedule";
 import { BUILTIN_TOOLS, type Routine, type ToolContext, type ToolHandler } from "./core/tools";
-import { folder, httpFetch, listenForSignIn, notify, openUrl, secrets } from "./platform";
+import { folder, httpFetch, isMobile, listenForSignIn, notify, openUrl, secrets, waitForAppLink } from "./platform";
 
 export type ProviderSetup = { id: string; kind: ProviderKind; baseUrl: string; label: string; hasKey: boolean; defaultModel?: string };
 
@@ -43,7 +43,8 @@ export const DEFAULT_SETTINGS: Settings = {
   providers: [],
   defaultModel: { providerId: "openrouter", model: "anthropic/claude-sonnet-5.5" },
   policy: { alwaysAllow: [] },
-  ecn: { origin: ecn.ECN_ORIGINS.production, toolsForAgents: true },
+  // A build can point at another server (VITE_ECN_ORIGIN, e.g. a local backend for tests).
+  ecn: { origin: (import.meta.env?.VITE_ECN_ORIGIN as string | undefined) || ecn.ECN_ORIGINS.production, toolsForAgents: true },
 };
 
 const TOKENS = "ecn.tokens";
@@ -177,11 +178,13 @@ export class Engine {
   /** A model this agent can actually run on: a set-up provider, or Earth Care Cloud on Pro. */
   canRun(model: ModelChoice): boolean {
     if (model.providerId === "ecn-cloud") return !!this.cloudEnterprise()?.cloud;
+    if (isMobile) return false; // on a phone, agents run on Earth Care Cloud only
     return !!model.model && this.settings.providers.some((p) => p.id === model.providerId);
   }
 
   /** Mystic can do something: there is a key, or an enterprise on Pro for the cloud. */
   hasUsableModel(): boolean {
+    if (isMobile) return !!this.cloudChoices().length;
     return this.settings.providers.length > 0 || !!this.cloudChoices().length;
   }
 
@@ -191,7 +194,7 @@ export class Engine {
 
   /** Move agents whose model can't run to one that can (the first key, else the cloud). */
   async repairModels(): Promise<void> {
-    const first = this.settings.providers[0];
+    const first = isMobile ? undefined : this.settings.providers[0];
     const fallback: ModelChoice | null = first
       ? { providerId: first.id, model: this.modelFor(first.id) }
       : this.cloudChoices().length
@@ -251,18 +254,35 @@ export class Engine {
 
   async signIn(): Promise<void> {
     const origin = this.settings.ecn.origin;
+    const redirectBase = isMobile ? ecn.MOBILE_REDIRECT : ecn.DESKTOP_REDIRECT_BASE;
     const meta = await ecn.discover(origin, httpFetch);
-    const clientId = this.settings.ecn.clientId || (await ecn.register(meta, httpFetch));
+    const clientId = this.settings.ecn.clientId || (await ecn.register(meta, httpFetch, redirectBase));
     if (clientId !== this.settings.ecn.clientId) await this.saveSettings({ ecn: { ...this.settings.ecn, clientId } });
     const { verifier, challenge } = await ecn.pkcePair();
     const state = ecn.randomState();
-    const { port, callback } = await listenForSignIn(state);
-    await openUrl(ecn.authorizeUrl(meta, { clientId, port, challenge, state }));
-    const cb = await callback;
+    let redirectUri: string;
+    let cb: { code?: string; state?: string; error?: string };
+    if (isMobile) {
+      // Safari shows the consent; iOS hands the code back through the app's own scheme.
+      redirectUri = ecn.MOBILE_REDIRECT;
+      const back = waitForAppLink(ecn.MOBILE_REDIRECT);
+      await openUrl(ecn.authorizeUrl(meta, { clientId, redirectUri, challenge, state }));
+      try {
+        const url = await back;
+        cb = { code: url.searchParams.get("code") || undefined, state: url.searchParams.get("state") || undefined, error: url.searchParams.get("error") || undefined };
+      } catch {
+        cb = { error: "timeout" };
+      }
+    } else {
+      const { port, callback } = await listenForSignIn(state);
+      redirectUri = ecn.loopbackRedirect(port);
+      await openUrl(ecn.authorizeUrl(meta, { clientId, redirectUri, challenge, state }));
+      cb = await callback;
+    }
     if (cb.error || !cb.code)
       throw new Error(cb.error === "access_denied" ? "Sign-in was cancelled." : cb.error === "timeout" ? "Sign-in timed out. Try again." : "Sign-in didn't finish. Try again.");
     if (cb.state !== state) throw new Error("That sign-in didn't come from this window. Try again.");
-    const tokens = await ecn.exchangeCode(meta, { clientId, code: cb.code, verifier, port }, httpFetch);
+    const tokens = await ecn.exchangeCode(meta, { clientId, code: cb.code, verifier, redirectUri }, httpFetch);
     await secrets.set(TOKENS, JSON.stringify(tokens));
     this.ecnTools = null;
     await this.refreshMe();

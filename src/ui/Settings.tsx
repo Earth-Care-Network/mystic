@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { engine } from "../engine";
-import { checkForUpdate, folder, openUrl, type UpdateStatus } from "../platform";
+import { checkForUpdate, folder, isMobile, openUrl, type UpdateStatus } from "../platform";
 import { useEngine } from "./hooks";
 import { ProviderForm } from "./ProviderForm";
 
-const TABS = [
+const ALL_TABS = [
   ["models", "Models & keys"],
   ["cloud", "Earth Care Network"],
   ["routines", "Routines"],
@@ -12,11 +12,14 @@ const TABS = [
   ["folder", "Your folder"],
   ["updates", "Updates"],
 ] as const;
+// On a phone: no keys (Earth Care Cloud only), no folder to open, updates come from the App Store.
+const TABS = isMobile ? ALL_TABS.filter(([k]) => k === "cloud" || k === "routines" || k === "approvals") : ALL_TABS;
 
 export function SettingsView({ tab }: { tab?: string }) {
-  const [active, setActive] = useState(tab || "models");
+  const first = TABS[0][0];
+  const [active, setActive] = useState(tab || first);
   useEffect(() => {
-    setActive(tab || "models");
+    setActive(tab && TABS.some(([k]) => k === tab) ? tab : first);
   }, [tab]);
   return (
     <section className="settings">

@@ -7,6 +7,10 @@ import type { FetchLike } from "./core/providers";
 
 export const inTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
+/** A phone or tablet build: Mystic there runs on Earth Care Cloud only (an enterprise on Pro). */
+export const isMobile =
+  typeof navigator !== "undefined" && /iPhone|iPad|iPod|Android/.test(navigator.userAgent) && (inTauri || /[?&]mobile=1/.test(location.search));
+
 async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   const { invoke } = await import("@tauri-apps/api/core");
   return invoke<T>(cmd, args);
@@ -100,6 +104,32 @@ export async function listenForSignIn(state: string): Promise<{ port: number; ca
   return { port, callback };
 }
 
+/** Phone sign-in: the OS hands network.earthcare.mystic:/oauth/callback?… back to the app. */
+export async function waitForAppLink(prefix: string, timeoutMs = 10 * 60_000): Promise<URL> {
+  const { onOpenUrl } = await import("@tauri-apps/plugin-deep-link");
+  return new Promise<URL>((resolve, reject) => {
+    let done = false;
+    let stop: (() => void) | undefined;
+    const timer = setTimeout(() => {
+      if (done) return;
+      done = true;
+      stop?.();
+      reject(new Error("timeout"));
+    }, timeoutMs);
+    void onOpenUrl((urls) => {
+      const hit = urls.find((u) => u.startsWith(prefix));
+      if (!hit || done) return;
+      done = true;
+      clearTimeout(timer);
+      stop?.();
+      resolve(new URL(hit));
+    }).then((unlisten) => {
+      stop = unlisten;
+      if (done) unlisten();
+    });
+  });
+}
+
 export async function notify(title: string, body: string): Promise<void> {
   if (!inTauri) return;
   const n = await import("@tauri-apps/plugin-notification");
@@ -112,7 +142,8 @@ export type UpdateStatus = { state: "none" | "available" | "downloading" | "read
 
 /** Checks the signed release feed. Downloads and installs only when asked. */
 export async function checkForUpdate(): Promise<{ status: UpdateStatus; install?: (onProgress: (pct: number) => void) => Promise<void> }> {
-  if (!inTauri) return { status: { state: "none" } };
+  // Phones update through the App Store; the browser preview has nothing to update.
+  if (!inTauri || isMobile) return { status: { state: "none" } };
   try {
     const { check } = await import("@tauri-apps/plugin-updater");
     const update = await check();

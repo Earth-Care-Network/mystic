@@ -18,6 +18,12 @@ export const ECN_ORIGINS = {
 
 export const SCOPES = "read build";
 
+/** Desktop: a loopback listener on any port (RFC 8252 §7.3). */
+export const DESKTOP_REDIRECT_BASE = "http://127.0.0.1/callback";
+export const loopbackRedirect = (port: number) => `http://127.0.0.1:${port}/callback`;
+/** Phone: the app's own private-use scheme, handed back by the OS (RFC 8252 §7.1). */
+export const MOBILE_REDIRECT = "network.earthcare.mystic:/oauth/callback";
+
 /**
  * Earth Care Network's MCP door. The public hosts serve `/mcp` (what every client is
  * told; web/ rewrites it to Django's `/mcp/`); a Django server reached directly, as in
@@ -74,13 +80,13 @@ export async function discover(origin: string, fetchImpl: FetchLike): Promise<OA
 }
 
 /** Registers once per install; the server reuses a public client with the same name and callback. */
-export async function register(meta: OAuthMeta, fetchImpl: FetchLike): Promise<string> {
+export async function register(meta: OAuthMeta, fetchImpl: FetchLike, redirectUri: string = DESKTOP_REDIRECT_BASE): Promise<string> {
   const res = await fetchImpl(meta.registration_endpoint, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       client_name: CLIENT_NAME,
-      redirect_uris: ["http://127.0.0.1/callback"],
+      redirect_uris: [redirectUri],
       token_endpoint_auth_method: "none",
       grant_types: ["authorization_code", "refresh_token"],
       response_types: ["code"],
@@ -91,11 +97,11 @@ export async function register(meta: OAuthMeta, fetchImpl: FetchLike): Promise<s
   return ((await res.json()) as { client_id: string }).client_id;
 }
 
-export function authorizeUrl(meta: OAuthMeta, p: { clientId: string; port: number; challenge: string; state: string }): string {
+export function authorizeUrl(meta: OAuthMeta, p: { clientId: string; redirectUri: string; challenge: string; state: string }): string {
   const q = new URLSearchParams({
     response_type: "code",
     client_id: p.clientId,
-    redirect_uri: `http://127.0.0.1:${p.port}/callback`,
+    redirect_uri: p.redirectUri,
     code_challenge: p.challenge,
     code_challenge_method: "S256",
     scope: SCOPES,
@@ -126,7 +132,7 @@ function toTokens(json: any): Tokens {
 
 export async function exchangeCode(
   meta: OAuthMeta,
-  p: { clientId: string; code: string; verifier: string; port: number },
+  p: { clientId: string; code: string; verifier: string; redirectUri: string },
   fetchImpl: FetchLike,
 ): Promise<Tokens> {
   const res = await fetchImpl(meta.token_endpoint, {
@@ -137,7 +143,7 @@ export async function exchangeCode(
       code: p.code,
       code_verifier: p.verifier,
       client_id: p.clientId,
-      redirect_uri: `http://127.0.0.1:${p.port}/callback`,
+      redirect_uri: p.redirectUri,
     }).toString(),
   });
   if (!res.ok) throw new Error(`Sign-in didn't finish${await oauthReason(res)}. Start it again from Settings · Earth Care Network.`);
