@@ -3,6 +3,13 @@ import { engine } from "../engine";
 import { useEngine } from "./hooks";
 import { ProviderForm } from "./ProviderForm";
 
+const SERVERS: [string, string][] = [
+  ["https://www.earthcare.network", "www.earthcare.network"],
+  ["https://test.earthcare.network", "test.earthcare.network (TEST)"],
+];
+
+const host = (origin: string) => origin.replace(/^https?:\/\//, "");
+
 export function Onboarding({ onDone }: { onDone: () => void }) {
   const e = useEngine();
   const [error, setError] = useState("");
@@ -26,7 +33,11 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
         <section>
           <h2>Or sign in to Earth Care Network</h2>
           <p className="muted">Your agents get your enterprise's context and tools. With an enterprise on Pro, they can run on Earth Care Cloud.</p>
-          {me && "off" in me ? <p className="error">Earth Care Cloud isn't switched on at this server yet. Add a key to start.</p> : null}
+          {me && "off" in me ? (
+            <p className="error">
+              Earth Care Cloud for Mystic isn't live on {host(e.settings.ecn.origin)} yet. Add a key to start, or choose another server below.
+            </p>
+          ) : null}
           {signedIn ? (
             <p className="muted">
               You're signed in as {me.user.name}. None of your enterprises is on Pro, so Earth Care Cloud isn't available. Add a key to start, or{" "}
@@ -55,6 +66,23 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
             {busy ? "Waiting for your browser…" : "Sign in to Earth Care Network"}
           </button>
           {error ? <p className="error">{error}</p> : null}
+          <div className="row start">
+            {me ? (
+              <button className="link small" onClick={() => void engine.signOut()}>
+                Sign out
+              </button>
+            ) : null}
+            <label className="inline small">
+              Server
+              <select value={e.settings.ecn.origin} onChange={(ev) => void engine.setOrigin(ev.target.value)}>
+                {SERVERS.map(([origin, label]) => (
+                  <option key={origin} value={origin}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
         </section>
       </div>
     </div>
