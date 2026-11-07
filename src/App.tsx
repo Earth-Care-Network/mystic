@@ -7,6 +7,7 @@ import { ChatView } from "./ui/Chat";
 import { useEngine } from "./ui/hooks";
 import { SettingsView } from "./ui/Settings";
 import { Onboarding } from "./ui/Onboarding";
+import { Mark } from "./ui/Mark";
 
 type View = { kind: "chat"; agentId: string } | { kind: "settings"; tab?: string };
 
@@ -25,7 +26,29 @@ export function App() {
     void checkForUpdate().then((r) => r.status.state === "available" && setUpdate(r.status.version || "new"));
   }, []);
 
-  if (!loaded) return <div className="splash">Mystic</div>;
+  // Keyboard: ⌘1–⌘9 open an agent, ⌘, opens Settings, Esc closes the panel and the team list.
+  useEffect(() => {
+    const onKey = (ev: KeyboardEvent) => {
+      const mod = ev.metaKey || ev.ctrlKey;
+      if (mod && ev.key === ",") {
+        ev.preventDefault();
+        setView({ kind: "settings" });
+      } else if (mod && /^[1-9]$/.test(ev.key)) {
+        const a = engine.agents[Number(ev.key) - 1];
+        if (a) {
+          ev.preventDefault();
+          setView({ kind: "chat", agentId: a.id });
+        }
+      } else if (ev.key === "Escape") {
+        setPanel(false);
+        setNavOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  if (!loaded) return <div className="splash"><Mark big /></div>;
   // On a phone, Mystic runs only on Earth Care Cloud: a sign-in and an enterprise on Pro.
   if (isMobile && !e.hasUsableModel()) return <MobileGate />;
   // Onboarding until Mystic can actually run something: a key, or an enterprise on Pro.
@@ -41,12 +64,16 @@ export function App() {
       </button>
       <aside className="sidebar" onClick={(ev) => (ev.target as HTMLElement).closest("button") && setNavOpen(false)}>
         <div className="brand" data-tauri-drag-region>
-          <span className="mark" aria-hidden /> Mystic
+          <Mark />
+          <span>
+            <span className="word">Mystic</span>
+            <span className="by">by Earth Care Network</span>
+          </span>
         </div>
         <nav aria-label="Your agents">
           <div className="label">Your team</div>
-          {e.agents.map((a) => (
-            <button key={a.id} className={`agent-row ${agent?.id === a.id ? "active" : ""}`} onClick={() => setView({ kind: "chat", agentId: a.id })}>
+          {e.agents.map((a, i) => (
+            <button key={a.id} title={i < 9 ? `⌘${i + 1}` : undefined} className={`agent-row ${agent?.id === a.id ? "active" : ""}`} onClick={() => setView({ kind: "chat", agentId: a.id })}>
               <span className="avatar">{a.name.slice(0, 1)}</span>
               <span className="who">
                 <span className="name">{a.name}</span>
