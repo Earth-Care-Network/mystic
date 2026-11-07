@@ -38,6 +38,8 @@ export type Chat = { history: ChatMessage[]; log: LogEntry[]; ecnThreadId?: stri
 export const MAX_TOOLS = 128;
 
 type Ask = (req: ApprovalRequest) => Promise<Decision>;
+/** The answer a routine gets: nobody is there. Handoffs from a routine pass it on. */
+const UNATTENDED: Ask = async () => "unattended";
 
 export const DEFAULT_SETTINGS: Settings = {
   providers: [],
@@ -86,6 +88,11 @@ export class Engine {
   async load(): Promise<void> {
     this.settings = { ...DEFAULT_SETTINGS, ...(await folder.readJson<Partial<Settings>>("settings.json", {})) };
     this.settings.ecn = { ...DEFAULT_SETTINGS.ecn, ...this.settings.ecn };
+    // settings.json is a plain file: a server it names that Mystic doesn't know never gets a token.
+    if (!ecn.isKnownOrigin(this.settings.ecn.origin)) {
+      await secrets.delete(TOKENS);
+      this.settings.ecn = { ...this.settings.ecn, origin: DEFAULT_SETTINGS.ecn.origin, clientId: undefined, enterpriseId: undefined };
+    }
     const files = await folder.list("agents");
     const loaded = await Promise.all(files.filter((f) => f.endsWith(".json")).map((f) => folder.readJson<Agent | null>(`agents/${f}`, null)));
     this.agents = loaded.filter((a): a is Agent => !!a && typeof a.id === "string");
@@ -188,6 +195,11 @@ export class Engine {
     return this.settings.providers.length > 0 || !!this.cloudChoices().length;
   }
 
+  /** The enterprises whose agents this person may run on Earth Care Cloud. */
+  cloudEnterprises(): ecn.Enterprise[] {
+    return this.cloudChoices();
+  }
+
   private cloudChoices(): ecn.Enterprise[] {
     return this.me && !("off" in this.me) ? this.me.enterprises.filter((e) => e.cloud) : [];
   }
@@ -217,7 +229,9 @@ export class Engine {
     const raw = await secrets.get(TOKENS);
     if (!raw) return null;
     try {
-      return JSON.parse(raw) as ecn.Tokens;
+      const t = JSON.parse(raw) as ecn.Tokens & { origin?: string };
+      // Tokens belong to the server that issued them; a sign-in never travels to another one.
+      return t.origin === this.settings.ecn.origin ? t : null;
     } catch {
       return null;
     }
@@ -234,7 +248,7 @@ export class Engine {
       try {
         const meta = await ecn.discover(this.settings.ecn.origin, httpFetch);
         const fresh = await ecn.refresh(meta, this.settings.ecn.clientId!, t.refresh_token!, httpFetch);
-        await secrets.set(TOKENS, JSON.stringify(fresh));
+        await secrets.set(TOKENS, JSON.stringify({ ...fresh, origin: this.settings.ecn.origin }));
         return fresh.access_token;
       } finally {
         this.refreshing = null;
@@ -245,7 +259,7 @@ export class Engine {
 
   /** Point Mystic at another Earth Care Network server: the old sign-in never travels there. */
   async setOrigin(origin: string): Promise<void> {
-    if (origin === this.settings.ecn.origin) return;
+    if (origin === this.settings.ecn.origin || !ecn.isKnownOrigin(origin)) return;
     await secrets.delete(TOKENS);
     this.me = null;
     this.ecnTools = null;
@@ -265,13 +279,13 @@ export class Engine {
     if (isMobile) {
       // Safari shows the consent; iOS hands the code back through the app's own scheme.
       redirectUri = ecn.MOBILE_REDIRECT;
-      const back = waitForAppLink(ecn.MOBILE_REDIRECT);
+      const back = waitForAppLink(ecn.MOBILE_REDIRECT, state);
       await openUrl(ecn.authorizeUrl(meta, { clientId, redirectUri, challenge, state }));
       try {
         const url = await back;
         cb = { code: url.searchParams.get("code") || undefined, state: url.searchParams.get("state") || undefined, error: url.searchParams.get("error") || undefined };
       } catch {
-        cb = { error: "timeout" };
+        cb = { error: "timeout", state };
       }
     } else {
       const { port, callback } = await listenForSignIn(state);
@@ -279,11 +293,11 @@ export class Engine {
       await openUrl(ecn.authorizeUrl(meta, { clientId, redirectUri, challenge, state }));
       cb = await callback;
     }
+    if (cb.state !== state) throw new Error("That sign-in didn't come from this window. Try again.");
     if (cb.error || !cb.code)
       throw new Error(cb.error === "access_denied" ? "Sign-in was cancelled." : cb.error === "timeout" ? "Sign-in timed out. Try again." : "Sign-in didn't finish. Try again.");
-    if (cb.state !== state) throw new Error("That sign-in didn't come from this window. Try again.");
     const tokens = await ecn.exchangeCode(meta, { clientId, code: cb.code, verifier, redirectUri }, httpFetch);
-    await secrets.set(TOKENS, JSON.stringify(tokens));
+    await secrets.set(TOKENS, JSON.stringify({ ...tokens, origin }));
     this.ecnTools = null;
     await this.refreshMe();
     await this.repairModels();
@@ -421,6 +435,7 @@ export class Engine {
       policy: this.settings.policy,
       onPolicy: (policy) => void this.saveSettings({ policy }),
       askApproval: ask,
+      unattended: ask === UNATTENDED,
       fetchImpl: httpFetch,
       signal,
       threadId,
@@ -501,7 +516,7 @@ export class Engine {
       // Advance every due routine before running any, so none runs twice.
       for (const r of due) r.nextAt = nextRun(r.schedule, new Date()).toISOString();
       await folder.writeJson("routines.json", this.routines);
-      const unattended: Ask = async () => "unattended";
+      const unattended = UNATTENDED;
       for (const r of due) {
         const answer = await this.runQuiet(r.agentId, r.task, 1, `routine · ${r.label}`, unattended, new AbortController().signal, [r.agentId]);
         const agent = this.agents.find((a) => a.id === r.agentId);

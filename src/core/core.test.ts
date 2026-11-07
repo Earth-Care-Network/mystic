@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import * as approvalsMod from "./approvals";
+import * as ecnMod from "./ecn";
 import { emptyTurn, reduce, type AguiEvent } from "./agui";
 import { chiefOfStaff, newAgent, tenantPackage, uniqueId } from "./agents";
 import { applyDecision, classify, needsApproval } from "./approvals";
@@ -356,4 +358,42 @@ test("the MCP door: /mcp on the public hosts, /mcp/ on a Django reached directly
   const { mcpUrl } = require("./ecn");
   expect(mcpUrl("https://www.earthcare.network")).toBe("https://www.earthcare.network/mcp");
   expect(mcpUrl("http://localhost:8070")).toBe("http://localhost:8070/mcp/");
+});
+
+describe("approval gate: audit fixes", () => {
+  const { needsApproval, canAlwaysAllow, applyDecision, policyKey, classify } = approvalsMod;
+  test("a routine (nobody there) asks for every write, even an always-allowed one", () => {
+    const policy = { alwaysAllow: ["write_note"] };
+    expect(needsApproval("write_note", policy)).toBe(false);
+    expect(needsApproval("write_note", policy, undefined, undefined, true)).toBe(true);
+    expect(needsApproval("read_note", policy, undefined, undefined, true)).toBe(false);
+  });
+  test("memory, new agents and routines are never always-allowed", () => {
+    for (const t of ["memory_write", "create_agent", "schedule_task"]) {
+      expect(canAlwaysAllow(t)).toBe(false);
+      expect(applyDecision({ alwaysAllow: [] }, t, "always_allow").alwaysAllow).toEqual([]);
+      expect(needsApproval(t, { alwaysAllow: [t] })).toBe(true);
+    }
+  });
+  test("a sub-step is part of what Always allow remembers", () => {
+    expect(policyKey("ecn__site", { action: "community", community_step: "create" })).toBe("ecn__site#community#create");
+    expect(policyKey("ecn__site", { action: "community", community_step: "hosts" })).not.toBe(policyKey("ecn__site", { action: "community", community_step: "create" }));
+  });
+  test("a server's tool never borrows a built-in tool's class", () => {
+    expect(classify("handoff")).toBe("read");
+    expect(classify("ecn__handoff")).toBe("write");
+  });
+});
+
+describe("Earth Care servers", () => {
+  test("only known servers get a sign-in", () => {
+    expect(ecnMod.isKnownOrigin("https://www.earthcare.network")).toBe(true);
+    expect(ecnMod.isKnownOrigin("https://test.earthcare.network")).toBe(true);
+    expect(ecnMod.isKnownOrigin("https://evil.example")).toBe(false);
+  });
+  test("discovery refuses endpoints on another host", async () => {
+    const meta = { issuer: "https://www.earthcare.network", authorization_endpoint: "https://www.earthcare.network/oauth/authorize", token_endpoint: "https://evil.example/token", registration_endpoint: "https://www.earthcare.network/oauth/register" };
+    const f = async () => new Response(JSON.stringify(meta), { status: 200 });
+    await expect(ecnMod.discover("https://www.earthcare.network", f as any)).rejects.toThrow();
+  });
 });

@@ -50,9 +50,16 @@ fi
 say "Installing to $dest…"
 rm -rf "$dest/Mystic.app"
 ditto "$mnt/Mystic.app" "$dest/Mystic.app"
-# Installed by you from a verified download: let macOS open it without the
-# "downloaded from the internet" prompt. Notarized builds won't need this.
-xattr -dr com.apple.quarantine "$dest/Mystic.app" 2>/dev/null || true
+# The app's own signature must be intact, whoever signed it.
+codesign --verify --deep --strict "$dest/Mystic.app" 2>/dev/null || { rm -rf "$dest/Mystic.app"; fail "Mystic's signature didn't verify. Nothing was installed."; }
+if spctl -a -t exec "$dest/Mystic.app" 2>/dev/null; then
+  : # Signed with a Developer ID and notarized by Apple: macOS opens it as is.
+else
+  # Not notarized yet (ad-hoc signed). You chose to install this verified download, so
+  # let macOS open it without the "can't be checked" prompt. Notarized builds skip this.
+  say "This build isn't notarized by Apple yet. Opening it anyway, since you installed it from a verified download."
+  xattr -dr com.apple.quarantine "$dest/Mystic.app" 2>/dev/null || true
+fi
 
 version=$(defaults read "$dest/Mystic.app/Contents/Info" CFBundleShortVersionString 2>/dev/null || echo "")
 say ""

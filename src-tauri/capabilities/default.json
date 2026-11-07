@@ -1,14 +1,13 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "What Mystic's window may do on every platform. HTTP reaches model providers and Earth Care Network over https, and local models on this machine only.",
+  "description": "What Mystic's window may do on every platform: open https links and the Mystic folder, reach model providers and Earth Care Network over https. Local models on this machine are desktop-only (desktop.json).",
   "windows": [
     "main"
   ],
   "permissions": [
     "core:default",
     "core:event:default",
-    "opener:default",
     "deep-link:default",
     {
       "identifier": "opener:allow-open-url",
@@ -23,9 +22,6 @@
       "allow": [
         {
           "path": "$HOME/Mystic"
-        },
-        {
-          "path": "$HOME/Mystic/**"
         }
       ]
     },
@@ -35,12 +31,6 @@
       "allow": [
         {
           "url": "https://*"
-        },
-        {
-          "url": "http://127.0.0.1:*"
-        },
-        {
-          "url": "http://localhost:*"
         }
       ]
     }

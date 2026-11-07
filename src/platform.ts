@@ -9,7 +9,10 @@ export const inTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in
 
 /** A phone or tablet build: Mystic there runs on Earth Care Cloud only (an enterprise on Pro). */
 export const isMobile =
-  typeof navigator !== "undefined" && /iPhone|iPad|iPod|Android/.test(navigator.userAgent) && (inTauri || /[?&]mobile=1/.test(location.search));
+  typeof navigator !== "undefined" &&
+  // iPadOS reports a Mac user agent; a Mac has no touch screen.
+  (/iPhone|iPad|iPod|Android/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)) &&
+  (inTauri || /[?&]mobile=1/.test(location.search));
 
 async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   const { invoke } = await import("@tauri-apps/api/core");
@@ -97,6 +100,8 @@ export async function listenForSignIn(state: string): Promise<{ port: number; ca
   let resolve!: (v: { code?: string; state?: string; error?: string }) => void;
   const callback = new Promise<{ code?: string; state?: string; error?: string }>((r) => (resolve = r));
   const unlisten = await listen<{ code?: string; state?: string; error?: string }>("oauth-callback", (e) => {
+    // Only this sign-in's answer: an older listener's timeout carries its own state.
+    if (e.payload.state !== state) return;
     unlisten();
     resolve(e.payload);
   });
@@ -105,7 +110,7 @@ export async function listenForSignIn(state: string): Promise<{ port: number; ca
 }
 
 /** Phone sign-in: the OS hands network.earthcare.mystic:/oauth/callback?… back to the app. */
-export async function waitForAppLink(prefix: string, timeoutMs = 10 * 60_000): Promise<URL> {
+export async function waitForAppLink(prefix: string, state: string, timeoutMs = 10 * 60_000): Promise<URL> {
   const { onOpenUrl } = await import("@tauri-apps/plugin-deep-link");
   return new Promise<URL>((resolve, reject) => {
     let done = false;
@@ -117,7 +122,11 @@ export async function waitForAppLink(prefix: string, timeoutMs = 10 * 60_000): P
       reject(new Error("timeout"));
     }, timeoutMs);
     void onOpenUrl((urls) => {
-      const hit = urls.find((u) => u.startsWith(prefix));
+      // Exactly the callback, carrying this sign-in's state: another app or page can't end it.
+      const hit = urls.find((u) => {
+        const [path, query = ""] = u.split("?");
+        return path === prefix && new URLSearchParams(query).get("state") === state;
+      });
       if (!hit || done) return;
       done = true;
       clearTimeout(timer);

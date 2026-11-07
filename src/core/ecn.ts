@@ -18,17 +18,19 @@ export const ECN_ORIGINS = {
 
 export const SCOPES = "read build";
 
+/** Servers Mystic sends a sign-in to: Earth Care Network, TEST, and the one this build was made for. */
+export function isKnownOrigin(origin: string): boolean {
+  const extra = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ECN_ORIGIN;
+  return (Object.values(ECN_ORIGINS) as string[]).includes(origin) || (!!extra && origin === extra);
+}
+
 /** Desktop: a loopback listener on any port (RFC 8252 §7.3). */
 export const DESKTOP_REDIRECT_BASE = "http://127.0.0.1/callback";
 export const loopbackRedirect = (port: number) => `http://127.0.0.1:${port}/callback`;
 /** Phone: the app's own private-use scheme, handed back by the OS (RFC 8252 §7.1). */
 export const MOBILE_REDIRECT = "network.earthcare.mystic:/oauth/callback";
 
-/**
- * Earth Care Network's MCP door. The public hosts serve `/mcp` (what every client is
- * told; web/ rewrites it to Django's `/mcp/`); a Django server reached directly, as in
- * local development, only answers `/mcp/` (APPEND_SLASH can't redirect a POST).
- */
+/** Earth Care Network's MCP address: `/mcp` on the public hosts, `/mcp/` on a server reached directly. */
 export function mcpUrl(origin: string): string {
   const host = (() => {
     try {
@@ -76,7 +78,19 @@ export function randomState(): string {
 export async function discover(origin: string, fetchImpl: FetchLike): Promise<OAuthMeta> {
   const res = await fetchImpl(`${origin}/.well-known/oauth-authorization-server`, { method: "GET", headers: { accept: "application/json" } });
   if (!res.ok) throw new Error("Couldn't reach Earth Care Network's sign-in. Check your connection.");
-  return (await res.json()) as OAuthMeta;
+  const meta = (await res.json()) as OAuthMeta & { issuer?: string };
+  // RFC 8414 §3.3: the issuer is the server asked, and every endpoint lives there too.
+  const base = origin.replace(/\/+$/, "");
+  const same = (u: string) => {
+    try {
+      return new URL(u).origin === new URL(base).origin;
+    } catch {
+      return false;
+    }
+  };
+  if ((meta.issuer && meta.issuer.replace(/\/+$/, "") !== base) || ![meta.authorization_endpoint, meta.token_endpoint, meta.registration_endpoint].every(same))
+    throw new Error("That server's sign-in points somewhere else, so Mystic stopped.");
+  return meta;
 }
 
 /** Registers once per install; the server reuses a public client with the same name and callback. */

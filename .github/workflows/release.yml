@@ -7,10 +7,10 @@
 #   TAURI_SIGNING_PRIVATE_KEY (+ _PASSWORD)  the updater signing key
 #   APPLE_*                                  Developer ID + notarization (when set)
 name: release
+# No manual dispatch: a release is only ever a `v*` tag, never a branch.
 on:
   push:
     tags: ["v*"]
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -62,3 +62,17 @@ jobs:
           releaseDraft: true
           uploadUpdaterJson: true
           args: ${{ matrix.args }}
+      # The one-line installer and the site download a stable name and check it
+      # against SHA256SUMS.txt from the same release.
+      - name: Mac download and checksums
+        if: matrix.platform == 'macos-15'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -eu
+          dmg=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg | head -n 1)
+          cp "$dmg" Mystic.dmg
+          shasum -a 256 Mystic.dmg > SHA256SUMS.txt
+          codesign --verify --deep --strict --verbose=2 src-tauri/target/universal-apple-darwin/release/bundle/macos/Mystic.app
+          gh release upload "$TAG" Mystic.dmg SHA256SUMS.txt --clobber --repo "$GITHUB_REPOSITORY"

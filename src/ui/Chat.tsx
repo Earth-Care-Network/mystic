@@ -181,9 +181,11 @@ function Approval({ req }: { req: ApprovalRequest }) {
         <button className="secondary" onClick={() => engine.decide(req.id, "refuse")}>
           Refuse
         </button>
-        <button className="secondary" onClick={() => engine.decide(req.id, "always_allow")}>
-          Always allow
-        </button>
+        {req.canAlways !== false ? (
+          <button className="secondary" onClick={() => engine.decide(req.id, "always_allow")}>
+            Always allow
+          </button>
+        ) : null}
         <button className="primary" onClick={() => engine.decide(req.id, "allow_once")}>
           Allow once
         </button>

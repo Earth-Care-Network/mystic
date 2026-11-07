@@ -6,7 +6,7 @@
 import type { AguiEvent, ApprovalRequest } from "./agui";
 import type { Agent } from "./agents";
 import { systemPrompt } from "./agents";
-import { applyDecision, needsApproval, summarize, type Decision, type Policy } from "./approvals";
+import { applyDecision, needsApproval, canAlwaysAllow, summarize, type Decision, type Policy } from "./approvals";
 import { safeJson, streamChat, type ChatMessage, type FetchLike, type ProviderConfig, type ToolCall } from "./providers";
 import type { ToolContext, ToolHandler } from "./tools";
 
@@ -23,6 +23,8 @@ export type LocalTurn = {
   policy: Policy;
   onPolicy?: (p: Policy) => void;
   askApproval: (req: ApprovalRequest) => Promise<Decision>;
+  /** Nobody is watching (a routine): every non-read call asks, so it is not done. */
+  unattended?: boolean;
   fetchImpl: FetchLike;
   signal?: AbortSignal;
   threadId: string;
@@ -93,8 +95,8 @@ export async function* runLocalTurn(t: LocalTurn): AsyncGenerator<AguiEvent> {
         const args = safeJson(call.arguments);
         let result: string;
         if (!handler) result = `Error: there is no tool ${call.name}.`;
-        else if (needsApproval(call.name, policy, handler.annotations, args)) {
-          const req: ApprovalRequest = { id: nextId("ask"), toolCallId: call.id, tool: call.name, summary: summarize(call.name, args), args };
+        else if (needsApproval(call.name, policy, handler.annotations, args, !!t.unattended)) {
+          const req: ApprovalRequest = { id: nextId("ask"), toolCallId: call.id, tool: call.name, summary: summarize(call.name, args), args, canAlways: canAlwaysAllow(call.name, handler.annotations, args) };
           yield { type: "CUSTOM", name: "approval_request", value: req };
           const decision = await t.askApproval(req);
           if (t.signal?.aborted) throw abortError();

@@ -25,6 +25,16 @@ export const KNOWN: Record<string, ToolClass> = {
   handoff: "read",
 };
 
+/**
+ * Tools whose effect outlives the turn: what an agent remembers (it enters every later
+ * system prompt), a new agent, a routine that runs with nobody there. A tool result can
+ * carry instructions, so these ask every time and never join "Always allow".
+ */
+export const NEVER_ALWAYS = new Set(["memory_write", "create_agent", "schedule_task"]);
+
+/** Mystic's own tools are known only by their bare names; a server's `ecn__handoff` is not Mystic's handoff. */
+const builtIn = (tool: string) => (tool.includes("__") || tool.includes("/") ? "" : tool.toLowerCase());
+
 export type Hints = { readOnlyHint?: boolean; destructiveHint?: boolean };
 
 const verb = (text: string) => OUTBOUND.test(text.toLowerCase().replace(/[^a-z0-9]+/g, "_"));
@@ -34,36 +44,54 @@ const verb = (text: string) => OUTBOUND.test(text.toLowerCase().replace(/[^a-z0-
  * the action it was asked to do, so "Always allow" on a tag never covers a delete.
  */
 export function classify(tool: string, hints?: Hints, args?: Record<string, unknown>): ToolClass {
+  const own = builtIn(tool);
+  if (own && KNOWN[own]) return KNOWN[own];
   const name = tool.toLowerCase().split(/\/|__/).pop() || tool.toLowerCase();
-  if (KNOWN[name]) return KNOWN[name];
   const action = typeof args?.action === "string" ? args.action : "";
   if (verb(name) || (action && verb(action)) || args?.confirm === true) return "outbound";
   if (hints?.destructiveHint) return "outbound";
   if (hints?.readOnlyHint) return "read";
   const readName = READ_PREFIXES.some((p) => name.startsWith(p)) || READ_SUFFIXES.some((x) => name.endsWith(x));
   const readAction = !action || READ_PREFIXES.some((p) => `${action}_`.startsWith(p)) || /^(get|list|read|search|find|status|preview|guide)$/.test(action);
+  // A server's tool is a read only when it says so, or when name and action both read.
   if (readName && readAction) return "read";
   return "write";
 }
 
 /** What "Always allow" remembers: the tool and, for a mixed tool, the action. */
 export function policyKey(tool: string, args?: Record<string, unknown>): string {
-  const action = typeof args?.action === "string" ? args.action.trim().toLowerCase().slice(0, 60) : "";
-  return action ? `${tool}#${action}` : tool;
+  // The action and every sub-step a mixed tool takes (`community_step`, `record_kind`,
+  // `mode`), so allowing one step never allows another.
+  const parts = Object.keys(args || {})
+    .filter((k) => k === "action" || /(^|_)(step|kind|mode)$/.test(k))
+    .sort()
+    .map((k) => (typeof args![k] === "string" ? String(args![k]).trim().toLowerCase().slice(0, 60) : ""))
+    .filter(Boolean);
+  return parts.length ? `${tool}#${parts.join("#")}` : tool;
 }
 
 export type Policy = { alwaysAllow: string[] };
 
-export function needsApproval(tool: string, policy: Policy, hints?: Hints, args?: Record<string, unknown>): boolean {
+/**
+ * Whether this call waits for a person. With nobody there (a routine, or an agent it
+ * handed to), every call that isn't a read asks, which means it isn't done: "Always
+ * allow" was a yes given while the person was watching.
+ */
+export function needsApproval(tool: string, policy: Policy, hints?: Hints, args?: Record<string, unknown>, unattended = false): boolean {
   const cls = classify(tool, hints, args);
   if (cls === "read") return false;
-  if (cls === "outbound") return true;
+  if (cls === "outbound" || unattended || NEVER_ALWAYS.has(builtIn(tool))) return true;
   return !policy.alwaysAllow.includes(policyKey(tool, args));
+}
+
+/** Whether the card may offer "Always allow" for this call. */
+export function canAlwaysAllow(tool: string, hints?: Hints, args?: Record<string, unknown>): boolean {
+  return classify(tool, hints, args) === "write" && !NEVER_ALWAYS.has(builtIn(tool));
 }
 
 export function applyDecision(policy: Policy, tool: string, decision: Decision, hints?: Hints, args?: Record<string, unknown>): Policy {
   const key = policyKey(tool, args);
-  if (decision !== "always_allow" || classify(tool, hints, args) !== "write" || policy.alwaysAllow.includes(key)) return policy;
+  if (decision !== "always_allow" || !canAlwaysAllow(tool, hints, args) || policy.alwaysAllow.includes(key)) return policy;
   return { alwaysAllow: [...policy.alwaysAllow, key] };
 }
 
