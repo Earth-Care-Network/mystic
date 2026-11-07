@@ -1,0 +1,8 @@
+# Every change needs a maintainer's review (branch ruleset: code owner review).
+*                     @Earth-Care-Network/mystic-maintainers
+# The parts that guard keys, sign-in, approvals and releases.
+/src-tauri/           @Earth-Care-Network/mystic-maintainers
+/src/core/approvals.ts @Earth-Care-Network/mystic-maintainers
+/src/core/ecn.ts      @Earth-Care-Network/mystic-maintainers
+/.github/             @Earth-Care-Network/mystic-maintainers
+/scripts/             @Earth-Care-Network/mystic-maintainers

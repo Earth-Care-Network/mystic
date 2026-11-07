@@ -1,0 +1,56 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Mystic",
+  "version": "0.1.0",
+  "identifier": "network.earthcare.mystic",
+  "build": {
+    "beforeDevCommand": "bun run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "bun run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Mystic",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 760,
+        "minHeight": 520,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Productivity",
+    "copyright": "Earth Care Network. MIT License.",
+    "shortDescription": "Your team of AI agents, on any key you bring.",
+    "longDescription": "Mystic by Earth Care Network is a free, open-source desktop team of AI agents. Bring any model key or run local models; sign in to Earth Care Network to run your agents on Earth Care Cloud with an enterprise on Pro.",
+    "createUpdaterArtifacts": true,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "12.0",
+      "signingIdentity": "-"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENCMjc0MkVCOTI4M0VCNTYKUldSVzY0T1M2MElueTJsU3pmVS9pR2l1R1ZhaXQ3d2c4THFDVTdiMjB0dDJHM3kvSlR3VjBIOTAK",
+      "endpoints": [
+        "https://github.com/Earth-Care-Network/mystic/releases/latest/download/latest.json"
+      ]
+    }
+  }
+}

@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mystic by Earth Care Network</title>
+<meta name="description" content="Your team of AI agents. Free and open source, on any key you bring. Download Mystic for Mac.">
+<meta property="og:title" content="Mystic by Earth Care Network">
+<meta property="og:description" content="Your team of AI agents. Free and open source, on any key you bring.">
+<meta property="og:image" content="https://earth-care-network.github.io/mystic/icon.png">
+<link rel="icon" href="favicon.png">
+<style>
+:root{--paper:#f6f3ec;--paper-2:#ece7db;--ink:#1d2a20;--ink-2:#4a5a4d;--line:#d9d2c1;--forest:#2f5a3c;--on-forest:#fff;--gold:#9a6f22;--card:#fff;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--paper:#121814;--paper-2:#1a221c;--ink:#e8eee6;--ink-2:#a7b5a8;--line:#2c3a2f;--forest:#86bb95;--on-forest:#0d1510;--gold:#d6aa52;--card:#1a231d;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:17px/1.6 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}
+a{color:var(--forest)}
+.wrap{max-width:1040px;margin:0 auto;padding:0 20px}
+nav{display:flex;justify-content:space-between;align-items:center;padding:18px 0}
+.brand{display:flex;gap:10px;align-items:center;font-weight:650;text-decoration:none;color:var(--ink)}
+.brand img{width:28px;height:28px;border-radius:7px}
+nav .links a{margin-left:18px;text-decoration:none;color:var(--ink-2);font-size:15px}
+nav .links a:hover{color:var(--ink)}
+header.hero{text-align:center;padding:56px 0 40px}
+header.hero img{width:96px;height:96px;border-radius:24px;box-shadow:0 10px 30px rgba(0,0,0,.18)}
+h1{font-size:clamp(34px,6vw,56px);line-height:1.08;margin:22px 0 12px;letter-spacing:-.02em}
+.lede{font-size:clamp(18px,2.4vw,22px);color:var(--ink-2);max-width:640px;margin:0 auto}
+.ethics{font-size:14px;color:var(--ink-2);margin-top:14px;letter-spacing:.02em}
+.cta{display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:30px}
+.btn{display:inline-flex;align-items:center;gap:10px;background:var(--forest);color:var(--on-forest);text-decoration:none;font-weight:600;padding:14px 26px;border-radius:14px;min-height:48px;font-size:18px}
+.btn:focus-visible,.copy:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
+.small{font-size:14px;color:var(--ink-2)}
+.cmd{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 6px 6px 14px;max-width:100%}
+.cmd code{font:14px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;overflow-x:auto;white-space:nowrap}
+.copy{border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:9px;padding:7px 12px;cursor:pointer;font:inherit;font-size:14px;min-height:36px}
+section{padding:48px 0;border-top:1px solid var(--line)}
+h2{font-size:28px;letter-spacing:-.01em;margin:0 0 8px}
+.sub{color:var(--ink-2);margin:0 0 26px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px}
+.card h3{margin:0 0 6px;font-size:18px}
+.card p{margin:0;color:var(--ink-2);font-size:16px}
+.keys{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.keys span{border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:14px;background:var(--card)}
+ol.steps{padding-left:22px}
+ol.steps li{margin:6px 0}
+details{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 18px;margin:10px 0}
+summary{cursor:pointer;font-weight:600}
+details p{color:var(--ink-2);margin:10px 0 0}
+.pro{display:grid;grid-template-columns:1.2fr 1fr;gap:24px;align-items:center}
+@media (max-width:760px){.pro{grid-template-columns:1fr} nav .links a:not(.gh){display:none}}
+footer{border-top:1px solid var(--line);padding:30px 0 50px;color:var(--ink-2);font-size:15px}
+footer .row{display:flex;flex-wrap:wrap;gap:18px;justify-content:space-between}
+footer a{color:var(--ink-2)}
+.sr{position:absolute;left:-9999px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav aria-label="Main">
+    <a class="brand" href="./"><img src="icon.png" alt="">Mystic</a>
+    <div class="links">
+      <a href="#features">What it does</a>
+      <a href="#install">Install</a>
+      <a href="#faq">Questions</a>
+      <a class="gh" href="https://github.com/Earth-Care-Network/mystic">GitHub</a>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <img src="icon.png" alt="The Mystic icon: a jaguar's eye">
+    <h1>Your team of AI agents.</h1>
+    <p class="lede">Free and open source, on any key you bring. A Chief of Staff sets up an agent for each part of your work, and every agent asks before it acts.</p>
+    <p class="ethics">Earth Care · People Care · Future Care · Fair Share</p>
+    <div class="cta">
+      <a class="btn" id="download" href="https://github.com/Earth-Care-Network/mystic/releases/latest/download/Mystic.dmg">Download for Mac</a>
+      <span class="small" id="version">For Apple silicon and Intel · macOS 12 or newer</span>
+      <span class="small">or install in one line:</span>
+      <div class="cmd">
+        <code id="oneliner">curl -fsSL https://earth-care-network.github.io/mystic/install.sh | sh</code>
+        <button class="copy" type="button" data-copy="oneliner">Copy</button>
+      </div>
+    </div>
+  </header>
+
+  <section id="features">
+    <h2>What it does</h2>
+    <p class="sub">A desktop app for running a small team of agents, on your Mac, with your keys.</p>
+    <div class="grid">
+      <div class="card"><h3>A Chief of Staff first</h3><p>Tell it about your work. It creates an agent for each part of the job (outreach, writing, research, operations) and hands tasks between them.</p></div>
+      <div class="card"><h3>Asks before it acts</h3><p>Reading runs on its own. Anything that changes something waits for you: Refuse, Allow once or Always allow. Sending, deleting and paying always ask.</p></div>
+      <div class="card"><h3>Each agent, its own model</h3><p>Pick a model per agent and switch mid-conversation. The agent keeps its job, its memory and the conversation.</p></div>
+      <div class="card"><h3>Memory you can edit</h3><p>Agents remember how you like things done, in plain sentences you can read, change or undo.</p></div>
+      <div class="card"><h3>Routines in plain words</h3><p>"Every weekday at 8am, brief me." Agents run on a schedule while Mystic is open.</p></div>
+      <div class="card"><h3>Your folder, your Mac</h3><p>Agents, chats, memory and notes are plain files in <code>~/Mystic</code>. Keys stay in your Mac's keychain.</p></div>
+    </div>
+  </section>
+
+  <section id="keys">
+    <h2>Any key you bring</h2>
+    <p class="sub">Add as many as you like. Keys go only to the provider they belong to.</p>
+    <div class="keys">
+      <span>OpenRouter</span><span>Anthropic</span><span>OpenAI</span><span>Google Gemini</span><span>xAI Grok</span><span>Groq</span><span>Mistral</span><span>DeepSeek</span><span>Ollama, on your Mac</span><span>LM Studio, on your Mac</span><span>Any OpenAI-compatible endpoint</span>
+    </div>
+  </section>
+
+  <section id="cloud">
+    <div class="pro">
+      <div>
+        <h2>Earth Care Cloud</h2>
+        <p class="sub" style="margin-bottom:12px">Sign in to <a href="https://www.earthcare.network">Earth Care Network</a> and your agents can use your enterprise's context and tools — people, deals, journal drafts, sites, events — on any model.</p>
+        <p class="sub">With an enterprise on Pro, an agent can run on Earth Care Cloud: Jaguar, Earth Care Network's own agent, with your enterprise's knowledge, and every write still waits for your yes.</p>
+      </div>
+      <div class="card">
+        <h3>Without Earth Care Network</h3>
+        <p>Mystic works fully on your own keys. No account, no subscription.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="install">
+    <h2>Install</h2>
+    <p class="sub">Two ways. Both install the same signed release from GitHub.</p>
+    <div class="grid">
+      <div class="card">
+        <h3>The one-line install</h3>
+        <p>Open Terminal and paste:</p>
+        <div class="cmd" style="margin-top:10px"><code id="oneliner2">curl -fsSL https://earth-care-network.github.io/mystic/install.sh | sh</code><button class="copy" type="button" data-copy="oneliner2">Copy</button></div>
+        <p style="margin-top:10px">It downloads the latest release, checks it against its published checksum, and puts Mystic in Applications. <a href="https://github.com/Earth-Care-Network/mystic/blob/main/scripts/install.sh">Read the script</a>.</p>
+      </div>
+      <div class="card">
+        <h3>The download</h3>
+        <ol class="steps">
+          <li>Open <strong>Mystic.dmg</strong> and drag Mystic to Applications.</li>
+          <li>Open Mystic. The first time, macOS may say it can't check the app: Mystic isn't notarized by Apple yet.</li>
+          <li>Open <strong>System Settings › Privacy &amp; Security</strong>, scroll down and click <strong>Open Anyway</strong>.</li>
+        </ol>
+        <p>The one-line install skips that step.</p>
+      </div>
+    </div>
+    <p class="small" style="margin-top:18px">Mystic checks for a new signed version when it starts and installs it when you say so. Windows and Linux builds: <a href="https://github.com/Earth-Care-Network/mystic/releases/latest">all downloads</a>.</p>
+  </section>
+
+  <section id="faq">
+    <h2>Questions</h2>
+    <details><summary>Is it really free?</summary><p>Yes. Mystic is MIT licensed. You pay your model provider for what you use, or nothing with a model on your Mac. Earth Care Cloud is part of an enterprise's Pro plan on Earth Care Network.</p></details>
+    <details><summary>Where do my keys go?</summary><p>Into your Mac's keychain, and only to the provider they belong to. They are never written to a file, never sent to Earth Care Network.</p></details>
+    <details><summary>Can an agent send an email or post without me?</summary><p>No. Sending, posting, paying, signing and deleting always ask, every time. Other changes ask once unless you choose Always allow.</p></details>
+    <details><summary>Why does macOS warn me the first time?</summary><p>Apple's notarization isn't set up for Mystic yet. The download is signed for updates and checked against a published checksum; the one-line install opens without the warning.</p></details>
+    <details><summary>Built on what?</summary><p>Tauri, React and TypeScript, with the approval gate, tenant-package format and AG-UI events of CopilotKit's open-source OpenDuet. You can export your team as an OpenDuet package.</p></details>
+    <details><summary>How do I help?</summary><p>Read <a href="https://github.com/Earth-Care-Network/mystic/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a> and open an issue. Security problems go privately to <a href="https://github.com/Earth-Care-Network/mystic/security/advisories/new">a security advisory</a>.</p></details>
+  </section>
+
+  <footer>
+    <div class="row">
+      <span>Mystic by <a href="https://www.earthcare.network">Earth Care Network</a> · MIT License</span>
+      <span><a href="https://github.com/Earth-Care-Network/mystic">Source</a> · <a href="https://github.com/Earth-Care-Network/mystic/blob/main/SECURITY.md">Security</a> · <a href="https://github.com/Earth-Care-Network/mystic/blob/main/CONTRIBUTING.md">Contribute</a></span>
+    </div>
+  </footer>
+</div>
+<script>
+// Copy buttons, and the current version under the download button.
+document.querySelectorAll('[data-copy]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var t = document.getElementById(b.getAttribute('data-copy')).textContent;
+    (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () {
+      b.textContent = 'Copied'; setTimeout(function () { b.textContent = 'Copy'; }, 1800);
+    }, function () { b.textContent = 'Select and copy'; });
+  });
+});
+fetch('https://api.github.com/repos/Earth-Care-Network/mystic/releases/latest').then(function (r) { return r.ok ? r.json() : null; }).then(function (rel) {
+  if (rel && rel.tag_name) document.getElementById('version').textContent = 'Mystic ' + rel.tag_name.replace(/^v/, '') + ' · Apple silicon and Intel · macOS 12 or newer';
+}).catch(function () {});
+</script>
+</body>
+</html>

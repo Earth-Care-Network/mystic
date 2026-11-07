@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security problem (privately)
+    url: https://github.com/Earth-Care-Network/mystic/security/advisories/new
+    about: Never open a public issue for a vulnerability.
+  - name: Earth Care Network help
+    url: https://www.earthcare.network
+    about: Questions about your Earth Care Network account or Pro plan.

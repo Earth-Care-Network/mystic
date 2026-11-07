@@ -1,0 +1,31 @@
+name: Something isn't working
+description: A bug in Mystic
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations: { required: true }
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to see it
+      placeholder: "1. … 2. … 3. …"
+  - type: input
+    id: version
+    attributes:
+      label: Mystic version and Mac model / OS
+      placeholder: "0.1.0, MacBook Air M2, macOS 15.4"
+  - type: dropdown
+    id: model
+    attributes:
+      label: Which model provider?
+      options: [OpenRouter, Anthropic, OpenAI, Gemini, Grok, Groq, Mistral, DeepSeek, Ollama, LM Studio, Other OpenAI-compatible, Earth Care Cloud]
+  - type: checkboxes
+    id: safe
+    attributes:
+      label: Before you post
+      options:
+        - label: I removed every key, token and personal detail from what I pasted.
+          required: true
