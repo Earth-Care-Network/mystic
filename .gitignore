@@ -5,3 +5,4 @@ src-tauri/gen/schemas/
 *.mystic-tmp
 .DS_Store
 *.log
+release/
