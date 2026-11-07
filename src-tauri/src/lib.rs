@@ -187,12 +187,18 @@ fn oauth_listen(app: AppHandle, state: String) -> Result<u16, String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
+        // Phones sign in through network.earthcare.mystic:/oauth/callback (RFC 8252 §7.1).
+        .plugin(tauri_plugin_deep_link::init());
+    // Desktop updates itself from signed releases; phones update through the App Store.
+    #[cfg(desktop)]
+    let builder = builder
         .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_updater::Builder::new().build());
+    builder
         .invoke_handler(tauri::generate_handler![
             secret_set,
             secret_get,

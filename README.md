@@ -77,6 +77,20 @@ agents on a self-hosted OpenDuet server.
 Mystic checks its signed release feed at launch and installs a new version only
 when you say so.
 
+## Mystic on iPhone and iPad
+
+Mystic on iPhone runs your agents on **Earth Care Cloud**: sign in to Earth Care
+Network, and it opens for an enterprise on Pro (owner, admin or member seat). It
+has no bring-your-own-key and sells nothing in the app; an owner starts Pro on
+earthcare.network. Sign-in goes through Safari and comes back to the app through
+`network.earthcare.mystic:/oauth/callback` (RFC 8252, PKCE).
+
+```sh
+bun run tauri ios dev                         # in the simulator, hot reload
+bun run tauri ios build --target aarch64-sim  # a simulator build
+# a device or TestFlight build needs bundle > iOS > developmentTeam (Apple Developer ID)
+```
+
 ## Contributing and security
 
 - How to contribute, and who can merge: [CONTRIBUTING.md](CONTRIBUTING.md)

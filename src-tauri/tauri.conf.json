@@ -43,6 +43,9 @@
     "macOS": {
       "minimumSystemVersion": "12.0",
       "signingIdentity": "-"
+    },
+    "iOS": {
+      "minimumSystemVersion": "16.0"
     }
   },
   "plugins": {
@@ -50,6 +53,16 @@
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENCMjc0MkVCOTI4M0VCNTYKUldSVzY0T1M2MElueTJsU3pmVS9pR2l1R1ZhaXQ3d2c4THFDVTdiMjB0dDJHM3kvSlR3VjBIOTAK",
       "endpoints": [
         "https://github.com/Earth-Care-Network/mystic/releases/latest/download/latest.json"
+      ]
+    },
+    "deep-link": {
+      "mobile": [
+        {
+          "scheme": [
+            "network.earthcare.mystic"
+          ],
+          "appLink": false
+        }
       ]
     }
   }

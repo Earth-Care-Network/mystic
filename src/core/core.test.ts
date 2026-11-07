@@ -212,7 +212,7 @@ describe("ecn sign-in", () => {
     const url = new URL(
       authorizeUrl(
         { authorization_endpoint: "https://www.earthcare.network/oauth/authorize", token_endpoint: "", registration_endpoint: "" },
-        { clientId: "c", port: 53111, challenge, state: "s" },
+        { clientId: "c", redirectUri: "http://127.0.0.1:53111/callback", challenge, state: "s" },
       ),
     );
     expect(url.searchParams.get("redirect_uri")).toBe("http://127.0.0.1:53111/callback");
